@@ -2,6 +2,12 @@
 
 Historia zmian aplikacji do wersji 0.1.7. Wersje 0.1.2–0.1.5 były etapami rozwoju bez osobnych wydań GitHub.
 
+## Niewydane
+
+- Automatyczna paczka Windows x64 w GitHub Actions, ZIP i SHA-256 jako artefakty oraz załączniki opublikowanych wydań.
+- Test rozpakowanych EXE: GUI, CLI, brak nadpisania, pliki towarzyszące i wznowienie tego samego zadania.
+- Dokumentacja budowania i publikacji; bez zmian w mechanizmach przenoszenia i dzienniku.
+
 ## 0.1.7 - 11 października 2026
 
 - Opcja GUI i CLI `--skip-app-resources`, przekazywana również do planowania przez SSH.

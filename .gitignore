@@ -14,3 +14,5 @@ _vendor/
 
 assets/*.ico
 assets/*.png
+
+work/

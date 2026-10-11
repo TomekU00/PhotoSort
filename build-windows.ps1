@@ -1,5 +1,8 @@
 param([string]$Python = "python", [string]$Output = "$PSScriptRoot/dist")
 $ErrorActionPreference = 'Stop'
+if ($env:OS -ne 'Windows_NT') { throw 'Windows build requires Windows' }
+$Output = [IO.Path]::GetFullPath($Output)
+if (Test-Path -LiteralPath (Join-Path $Output 'PhotoSort')) { throw 'Use a fresh output directory to avoid stale files' }
 Set-Location -LiteralPath $PSScriptRoot
 & $Python make-icon.py
 if ($LASTEXITCODE) { throw 'Icon build failed' }
