@@ -151,11 +151,43 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(len(plan['files']), 2)
         self.assertEqual({Path(p['destination']).parent for p in plan['files']}, {self.dst/'2000'/'01'})
 
-    def test_reject_nested_roots_and_path_escape(self):
+    def test_reject_equal_roots_parent_target_and_path_escape(self):
         with self.assertRaises(ValueError):
-            Organizer(self.job).plan(self.src, self.src/'dest')
+            Organizer(self.job).plan(self.src, self.src)
+        with self.assertRaises(ValueError):
+            Organizer(self.job).plan(self.src, self.base)
         with self.assertRaises(ValueError):
             folder_for(datetime.now(), '../../%Y')
+
+    def test_nested_destination_excluded_and_preserved(self):
+        target = self.src/'posegregowane'
+        target.mkdir()
+        existing = target/'2024'/'03'/'file.txt'
+        existing.parent.mkdir(parents=True)
+        existing.write_bytes(b'already sorted')
+        source = self.create('file.txt', b'new photo data')
+        self.create('subfolder/other.txt', b'other')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, target)
+        self.assertEqual(len(plan['files']), 2)
+        self.assertIn(str(target), plan['skipped'])
+        self.assertTrue(all(target in Path(r['destination']).parents for r in plan['files']))
+        org.apply()
+        self.assertFalse(source.exists())
+        self.assertEqual(existing.read_bytes(), b'already sorted')
+        org.apply()
+        new_plan = Organizer(self.base/'second-job').plan(self.src, target)
+        self.assertEqual(new_plan['files'], [])
+
+    def test_new_nested_destination_can_be_created(self):
+        target = self.src/'new'/'posegregowane'
+        source = self.create('photo.jpg')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, target)
+        self.assertEqual(len(plan['files']), 1)
+        org.apply()
+        self.assertFalse(source.exists())
+        self.assertTrue(Path(plan['files'][0]['destination']).is_file())
 
     def test_pause_before_move_retains_source(self):
         src = self.create('file.txt')
