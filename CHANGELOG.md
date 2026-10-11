@@ -1,0 +1,58 @@
+# Changelog PhotoSort
+
+Historia zmian aplikacji do wersji 0.1.6. Wersje 0.1.2–0.1.5 były etapami rozwoju na gałęzi głównej, bez osobnych wydań GitHub. Dokumentacja została uzupełniona 11 października 2026; nie zmienia to wersji programu.
+
+## 0.1.6
+
+- Usuwanie pustych katalogów po zakończeniu weryfikacji, od najgłębszych podkatalogów do pustego źródła. Operacja `rmdir` pozostawia katalogi zawierające pliki; cel, korzenie dysków i punkty montowania są chronione.
+- Raport sprzątania `cleanup.json` i licznik usuniętych katalogów w statusie oraz GUI.
+- Wielokrotny wybór zakresu: zdjęcia/RAW, filmy i dźwięk w dowolnej kombinacji; terminal obsługuje listę rozdzieloną przecinkami.
+- Odświeżony interfejs Tkinter/ttk oraz ikona PS.
+- Wersja Windows z `PhotoSort.exe`, `PhotoSort-Terminal.exe` i dołączonym środowiskiem Python; skrypty budowania PyInstaller i generowania ikony.
+- Walidacja: 18 testów bezpieczeństwa, uruchomienie obu EXE bez PYTHONPATH/PYTHONHOME oraz planowanie i przenoszenie w terminalowym EXE.
+- Uzupełnienie wydania: edukacyjna dokumentacja techniczna PDF oraz pełna historia zmian. Tryb SSH aktualnego programu nadal wymaga testu przenoszenia na rzeczywistym NAS.
+
+## 0.1.5
+
+- Ograniczenie nowych planów i wyboru rozszerzeń do multimediów: zdjęć/grafiki, RAW, filmów i dźwięku.
+- Usunięcie grup dokumentów, archiwów i innych plików oraz dowolnych nieznanych rozszerzeń.
+- Samodzielne JSON nie są wybierane jako multimedia; rozpoznane pliki towarzyszące nadal przenoszą się z wybranymi zdjęciami lub filmami.
+- Zachowanie niezmienności już zapisanych planów; doprecyzowanie dokumentacji. Walidacja: 15 testów.
+
+## 0.1.4
+
+- Obsługa celu zagnieżdżonego w źródle, np. Desktop → Desktop/posegregowane.
+- Pomijanie całego drzewa docelowego przy skanowaniu, również przy kolejnych zadaniach; zachowanie istniejącej zawartości celu.
+- Nadal odrzucane są identyczne źródło i cel oraz cel nadrzędny względem źródła. Walidacja: 14 testów.
+
+## 0.1.3
+
+- Grupowane listy rozszerzeń w GUI, CLI i zadaniach SSH, oparte na wcześniej zebranych formatach.
+- Okno wyboru rozszerzeń z przewijaniem, zaznaczaniem poszczególnych pozycji i grupami, w tym RAW oraz audio.
+- Parametr `--extensions`; zapis filtra w konfiguracji niezmiennego planu. Automatyczne dołączanie rozpoznanych plików towarzyszących.
+- W tej wersji były też grupy dokumentów, archiwów i innych plików; zostały wycofane w 0.1.5. Walidacja: 12 testów.
+
+## 0.1.2
+
+- Wyraźny wybór lokalnie → lokalnie, komputer/udział sieciowy oraz SSH na NAS.
+- Osobne pola adresu serwera i użytkownika, przycisk testowania logowania oraz terminalowe `connect`.
+- Logowanie przez standardowego klienta OpenSSH bez zapisywania hasła; czytelniejsze błędy SSH i opcja `--wait`, pozostawiająca terminal otwarty.
+- Objaśnienie różnicy między ścieżkami komputera i ścieżkami na NAS.
+
+## 0.1.1
+
+- Poprawienie testów dla krótkich ścieżek Windows 8.3 przez rozwiązywanie rzeczywistych ścieżek.
+- Sprawdzenie CI na Windows i Linux z Pythonem 3.8 oraz 3.12; aktualizacja paczki przenośnej.
+
+## 0.1.0
+
+- Pierwsza aplikacja GUI i CLI do porządkowania multimediów według dat, lokalnie, na udziałach sieciowych i poprzez zadania SSH.
+- Konfigurowalny format folderów oraz odczyt dat EXIF, osadzonego XMP, kontenerów QuickTime i JSON Google Takeout; jawny fallback do daty modyfikacji.
+- Plan przed wykonaniem, kontrola źródeł i celów, brak nadpisywania oraz wspólne rozwiązywanie kolizji zdjęć i plików towarzyszących.
+- Dziennik operacji, trwały status, zatrzymanie i wznowienie tego samego zadania.
+- Przenoszenie w obrębie systemu plików oraz kopiowanie między systemami plików ze sprawdzeniem SHA-256 przed usunięciem źródła.
+- Pakiet roboczy wysyłany na NAS z zależnościami; proces zdalny odłączony od sesji komputera. Początkowy zestaw 9 testów bezpieczeństwa.
+
+## Zakres historii
+
+Wcześniejsze jednorazowe skrypty NAS, galeria WWW i pomysły na deduplikację były genezą projektu, ale nie stanowią funkcji PhotoSort 0.1.6. Aplikacja nie oferuje obecnie deduplikacji, galerii GPS, automatycznego pobierania Google Photos ani automatycznego cofnięcia wszystkich operacji.
