@@ -128,6 +128,7 @@ def select_media(rows, categories, extensions, timezone, status, stop):
 
 
 def attach_companions(rows, selected, lookup):
+    rows_by_path = {r['path']: r for r in rows}
     selected_paths = {r['path'] for r in selected}
     companions = {}
     # Exact JSON names, the Takeout json/ subdirectory, and basename edits.
@@ -145,7 +146,7 @@ def attach_companions(rows, selected, lookup):
                 # Shared RAW/JPEG edit file: deterministic first claimant.
                 companions.setdefault(match, r['path'])
                 if match not in selected_paths:
-                    selected.append(next(row for row in rows if row['path'] == match))
+                    selected.append(rows_by_path[match])
                     selected_paths.add(match)
     return companions
 

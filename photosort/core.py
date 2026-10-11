@@ -15,16 +15,26 @@ class Organizer:
         self.notify = notify or (lambda s: None)
         self.stop = stop or (lambda: False)
         self.started = time.monotonic()
+        self._last_status_write = None
+        self._last_status_stage = None
 
     def status(self, stage, done, total, **extra):
-        elapsed = time.monotonic() - self.started
+        now = time.monotonic()
+        elapsed = now - self.started
         speed = done / elapsed if elapsed else 0
         value = dict(stage=stage, done=done, total=total,
                      percent=round(100*done/total, 2) if total else 0,
                      files_per_second=round(speed, 2),
                      eta_seconds=round((total-done)/speed) if speed else None,
                      seconds=round(elapsed, 1), errors=0, **extra)
-        save(self.job/'progress.json', value)
+        # Progress is a snapshot, not the recovery journal. Bound disk I/O while
+        # preserving stage transitions and the final update of each stage.
+        if (stage != self._last_status_stage or self._last_status_write is None
+                or now - self._last_status_write >= 1.0
+                or (total > 0 and done >= total)):
+            save(self.job/'progress.json', value)
+            self._last_status_write = now
+            self._last_status_stage = stage
         self.notify(value)
 
     def lock(self):

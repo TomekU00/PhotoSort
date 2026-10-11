@@ -66,6 +66,8 @@ Dopiero po weryfikacji sprzątanie odwiedza katalogi od najgłębszych. Sprawdza
 
 ## 9. SSH na NAS
 
+`progress.json` jest migawką: wewnątrz tego samego etapu zapis następuje najwyżej raz na sekundę, przy kolejnym zgłoszeniu postępu. Zmiana etapu, jego zakończenie, błąd i pauza są zapisywane od razu. Powiadomienia GUI i CLI nadal otrzymują każdą aktualizację. Ograniczenie nie dotyczy `journal.jsonl`: każde zdarzenie operacji nadal przechodzi flush/fsync. Nie jest wymagany timer ani dodatkowy wątek.
+
 Komputer wymaga standardowego klienta ssh, a serwer powłoki Unix i Python 3.8+. PhotoSort tworzy pakiet kodu z ExifRead, pytz i plikami stref czasowych. Wysyła go przez SSH, rozpakowuje do cache aplikacji na NAS i uruchamia odłączony proces z logiem. Poszczególne kroki mogą otwierać więcej niż jedno połączenie i ponawiać pytanie o hasło.
 
 Hasło obsługuje klient OpenSSH; aplikacja go nie zapisuje i nie wyłącza kontroli klucza serwera. Przycisk testu logowania sprawdza dostęp i wersję Python. Zadanie serwera zapisuje pliki w ~/.photosort/jobs/ID. Wyłączenie komputera nie zatrzymuje już uruchomionego procesu NAS. Zatrzymanie GUI dotyczy pracy lokalnej; nie steruje odłączonym procesem zdalnym.

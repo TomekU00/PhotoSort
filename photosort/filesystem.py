@@ -72,6 +72,15 @@ class FileMover:
                 h.update(b)
         return h.hexdigest()
 
+    def linked_intent(self, src, dst, item, event):
+        """Recognize an interrupted link/unlink only from persisted identity."""
+        if not event or event['status'] not in ('intent', 'linked'):
+            return False
+        source_stat = self.valid(src, item)
+        target_stat = self.valid(dst, item)
+        identity = (event.get('device'), event.get('inode'))
+        return (source_stat.st_dev, source_stat.st_ino) == identity == (target_stat.st_dev, target_stat.st_ino)
+
     def preflight(self, item):
         src, dst = Path(item['source']), Path(item['destination'])
         src.parent.resolve().relative_to(self.source_root)
@@ -79,7 +88,8 @@ class FileMover:
         event = self.journal.prior.get(str(src))
         if src.exists():
             self.valid(src, item)
-            if dst.exists() and not (event and event['status'] in ('copy_ready', 'copied', 'linked')):
+            if dst.exists() and not (event and event['status'] in ('copy_ready', 'copied')
+                                     or self.linked_intent(src, dst, item, event)):
                 raise FileExistsError(str(dst))
         else:
             if not event:
@@ -102,14 +112,17 @@ class FileMover:
         dst.parent.resolve().relative_to(self.target_root)
         old = self.journal.prior.get(str(src))
         if dst.exists():
-            if not old or old['status'] not in ('copy_ready', 'copied', 'linked'):
+            linked = self.linked_intent(src, dst, item, old)
+            if not linked and (not old or old['status'] not in ('copy_ready', 'copied')):
                 raise FileExistsError(str(dst))
             if old.get('sha256'):
                 if self.digest(src) != old['sha256'] or self.digest(dst) != old['sha256']:
                     raise ValueError('Wznowienie: kopia niezgodna')
-            elif dst.stat().st_ino != s.st_ino:
+            elif not linked:
                 raise ValueError('Wznowienie: inny plik')
             self.valid(src, item)
+            # The crash may have happened immediately after link(), before sync.
+            self.syncdir(dst.parent)
             src.unlink()
             self.syncdir(src.parent)
             self.journal.record(item, 'moved', **{k: old[k] for k in ('sha256', 'device', 'inode') if k in old})
