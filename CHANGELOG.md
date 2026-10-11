@@ -1,8 +1,10 @@
 # Changelog PhotoSort
 
-Historia zmian aplikacji do wersji 0.1.7. Wersje 0.1.2–0.1.5 były etapami rozwoju bez osobnych wydań GitHub.
+Historia zmian aplikacji do wersji 0.1.8. Wersje 0.1.2–0.1.5 były etapami rozwoju bez osobnych wydań GitHub.
 
 ## Niewydane
+
+## 0.1.8 - 11 października 2026
 
 - Naprawa końcowego wpisu dziennika bez nowej linii przed dopisywaniem kolejnych zdarzeń.
 - Wznowienie przerwanej operacji link/unlink po sprawdzeniu urządzenia i inode obu ścieżek z dziennikiem.
@@ -17,6 +19,8 @@ Historia zmian aplikacji do wersji 0.1.7. Wersje 0.1.2–0.1.5 były etapami roz
 - Automatyczna paczka Windows x64 w GitHub Actions, ZIP i SHA-256 jako artefakty oraz załączniki opublikowanych wydań.
 - Test rozpakowanych EXE: GUI, CLI, brak nadpisania, pliki towarzyszące i wznowienie tego samego zadania.
 - Dokumentacja budowania i publikacji; bez zmian w mechanizmach przenoszenia i dzienniku.
+
+- Walidacja: 59 testów, w tym 17 nowych testów regresji i wydajności; CI Windows/Linux dla Python 3.8/3.12 oraz test rozpakowanych EXE. Testy GUI na Linux bez ekranu są pomijane.
 
 ## 0.1.7 - 11 października 2026
 

@@ -1,4 +1,4 @@
-# PhotoSort 0.1.7 - dokumentacja techniczna i edukacyjna
+# PhotoSort 0.1.8 - dokumentacja techniczna i edukacyjna
 
 Stan: 11 października 2026. Dokument opisuje obecną implementację, nie planowane funkcje. Czytelnik pozna drogę pliku od skanowania do zweryfikowanego celu oraz sposób odzyskiwania pracy po przerwaniu.
 

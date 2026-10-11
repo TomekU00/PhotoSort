@@ -178,7 +178,7 @@ python -m pip install . -r requirements-build.txt
 python -m unittest discover -s tests -v
 ./build-windows.ps1
 ./package-windows.ps1
-python scripts/smoke-windows.py dist/PhotoSort-0.1.7-windows-x64.zip
+python scripts/smoke-windows.py dist/PhotoSort-0.1.8-windows-x64.zip
 ```
 
 Używaj świeżego katalogu wyjściowego. Rozpakuj cały ZIP, zachowując strukturę `PhotoSort/`. Paczka nie zawiera zadań użytkownika; aktualizacja nie zmienia planów i dzienników w `~/.photosort/jobs/`. Wznawiaj przez `apply --job` dla tego samego zadania. Test paczki korzysta wyłącznie z tymczasowych danych syntetycznych.

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "photosort-tool"
-version = "0.1.7"
+version = "0.1.8"
 description = "Organize photos and media by capture date, locally or over SSH"
 requires-python = ">=3.8"
 dependencies = ["ExifRead>=3.0,<4", "pytz>=2024.1"]
