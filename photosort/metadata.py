@@ -38,12 +38,15 @@ def quicktime_date(path):
                 if size < header or start + size > end:
                     break
                 if kind == b'mvhd':
-                    data = f.read(16)
-                    if len(data) >= 12:
-                        stamp = int.from_bytes(data[4:12] if data[0] == 1 else data[4:8], 'big')
-                        d = datetime(1904, 1, 1) + timedelta(seconds=stamp)
-                        if 1900 < d.year <= datetime.now().year + 1:
-                            return d
+                    data = f.read(min(16, size - header))
+                    required = {0: 8, 1: 12}.get(data[0]) if data else None
+                    if required and len(data) >= required:
+                        stamp = int.from_bytes(data[4:required], 'big')
+                        # Zero means no usable creation date; try sidecar/mtime.
+                        if stamp:
+                            d = datetime(1904, 1, 1) + timedelta(seconds=stamp)
+                            if 1900 < d.year <= datetime.now().year + 1:
+                                return d
                 if kind == b'moov' and depth < 3:
                     d = walk(start + size, depth + 1)
                     if d:
