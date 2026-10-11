@@ -39,15 +39,26 @@ class SafetyTests(unittest.TestCase):
         self.assertFalse(photo.exists() or sidecar.exists())
         self.assertTrue(video.exists() and text.exists())
 
-    def test_unknown_and_extensionless_filters(self):
-        self.create('unknown.weirdformat')
-        self.create('LICENSEFILE')
-        self.create('known.txt')
-        plan = Organizer(self.job).plan(self.src, self.dst, extensions='@none,@other')
-        self.assertEqual({Path(r['source']).name for r in plan['files']}, {'unknown.weirdformat', 'LICENSEFILE'})
+    def test_only_media_selected_and_other_formats_retained(self):
+        for name in ('photo.jpg','raw.cr3','clip.mp4','sound.mp3','document.pdf','notes.txt','archive.zip','data.json','unknown.weird','NOEXT'):
+            self.create(name)
+        plan = Organizer(self.job).plan(self.src, self.dst)
+        self.assertEqual({Path(r['source']).name for r in plan['files']}, {'photo.jpg','raw.cr3','clip.mp4','sound.mp3'})
+        Organizer(self.job).apply()
+        self.assertTrue((self.src/'document.pdf').exists())
+        self.assertTrue((self.src/'data.json').exists())
+        for invalid in ('pdf','zip','json','@none','@other'):
+            with self.assertRaises(ValueError):
+                Organizer(self.base/('bad-'+invalid)).plan(self.src,self.dst,extensions=invalid)
+
+    def test_audio_scope_excludes_images(self):
+        self.create('sound.mp3')
+        self.create('photo.jpg')
+        plan = Organizer(self.job).plan(self.src,self.dst,scope='audio')
+        self.assertEqual([Path(r['source']).name for r in plan['files']], ['sound.mp3'])
 
     def test_extension_filter_is_immutable_and_old_plan_still_loads(self):
-        self.create('note.txt')
+        self.create('note.jpg')
         org = Organizer(self.job)
         original = org.plan(self.src, self.dst)
         self.assertNotIn('extensions', original['config'])
@@ -58,8 +69,8 @@ class SafetyTests(unittest.TestCase):
             Organizer(self.base/'empty-selection').plan(self.src, self.dst, extensions=[])
 
     def test_plan_does_not_move_and_preserves_collisions(self):
-        a = self.create('one/file.txt', b'one')
-        b = self.create('two/file.txt', b'two')
+        a = self.create('one/file.jpg', b'one')
+        b = self.create('two/file.jpg', b'two')
         org = Organizer(self.job)
         plan = org.plan(self.src, self.dst)
         self.assertTrue(a.exists() and b.exists())
@@ -70,7 +81,7 @@ class SafetyTests(unittest.TestCase):
         org.apply()  # completed job is resumable
 
     def test_cross_filesystem_copy_and_resume(self):
-        src = self.create('file.txt', b'content'*100)
+        src = self.create('file.jpg', b'content'*100)
         org = Organizer(self.job)
         plan = org.plan(self.src, self.dst)
         real = rename_exclusive
@@ -85,7 +96,7 @@ class SafetyTests(unittest.TestCase):
         org.apply()
 
     def test_corrupt_copy_retains_source(self):
-        src = self.create('file.txt', b'original')
+        src = self.create('file.jpg', b'original')
         org = Organizer(self.job)
         org.plan(self.src, self.dst)
         real = rename_exclusive
@@ -103,7 +114,7 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(src.read_bytes(), b'original')
 
     def test_new_destination_never_overwritten(self):
-        src = self.create('file.txt')
+        src = self.create('file.jpg')
         org = Organizer(self.job)
         plan = org.plan(self.src, self.dst)
         dest = Path(plan['files'][0]['destination'])
@@ -115,7 +126,7 @@ class SafetyTests(unittest.TestCase):
         self.assertEqual(dest.read_bytes(), b'other')
 
     def test_partial_copy_can_resume(self):
-        src = self.create('file.txt', b'content'*100)
+        src = self.create('file.jpg', b'content'*100)
         org = Organizer(self.job)
         plan = org.plan(self.src, self.dst)
         real = rename_exclusive
@@ -135,7 +146,7 @@ class SafetyTests(unittest.TestCase):
         self.assertFalse(src.exists())
 
     def test_changed_source_not_moved(self):
-        src = self.create('file.txt')
+        src = self.create('file.jpg')
         org = Organizer(self.job)
         org.plan(self.src, self.dst)
         src.write_bytes(b'changed-longer')
@@ -162,11 +173,11 @@ class SafetyTests(unittest.TestCase):
     def test_nested_destination_excluded_and_preserved(self):
         target = self.src/'posegregowane'
         target.mkdir()
-        existing = target/'2024'/'03'/'file.txt'
+        existing = target/'2024'/'03'/'file.jpg'
         existing.parent.mkdir(parents=True)
         existing.write_bytes(b'already sorted')
-        source = self.create('file.txt', b'new photo data')
-        self.create('subfolder/other.txt', b'other')
+        source = self.create('file.jpg', b'new photo data')
+        self.create('subfolder/other.jpg', b'other')
         org = Organizer(self.job)
         plan = org.plan(self.src, target)
         self.assertEqual(len(plan['files']), 2)
@@ -190,7 +201,7 @@ class SafetyTests(unittest.TestCase):
         self.assertTrue(Path(plan['files'][0]['destination']).is_file())
 
     def test_pause_before_move_retains_source(self):
-        src = self.create('file.txt')
+        src = self.create('file.jpg')
         org = Organizer(self.job)
         org.plan(self.src, self.dst)
         with self.assertRaises(InterruptedError):
