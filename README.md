@@ -114,3 +114,13 @@ Testy obejmują brak nadpisania, zmienione źródło, kolizje nazw, kopiowanie m
 systemami plików, błędną kopię, wznowienie, JSON przy zdjęciu i przerwanie.
 CI jest przygotowane dla Windows/Linux i Python 3.8/3.12. Testy lokalne nie
 potwierdzają zachowania każdego serwera SMB ani wszystkich odmian metadanych.
+
+## Wybór trybu i logowanie SSH
+
+- **Lokalnie → lokalnie**: wybierz np. `C:\Zdjecia` i `D:\Kolekcja`.
+- **Komputer / dysk sieciowy**: wybierz foldery lokalne lub zmapowane udziały.
+- **SSH na NAS / Linux**: podaj osobno adres NAS (np. `192.168.68.60`) i użytkownika DSM (np. `Tomek`). Źródło i cel są ścieżkami NAS, np. `/volume1/photo` i `/volume1/homes`.
+
+Kliknij **Sprawdź logowanie SSH**. W terminalu wpisz hasło użytkownika DSM i Enter — znaki hasła nie są wyświetlane. Przy pierwszym połączeniu sprawdź odcisk klucza serwera przed zaakceptowaniem. Wynik `Python 3.8.15` oznacza, że logowanie i dostęp do Pythona działają. Terminal czeka na Enter przed zamknięciem. Linux pokazuje polecenie do uruchomienia we własnym terminalu.
+
+Test logowania nie uruchamia przenoszenia. Tworzenie planu i wznowienie otwierają osobne połączenia SSH, więc mogą ponownie poprosić o hasło. Hasło nie jest zapisywane przez PhotoSort.
