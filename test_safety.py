@@ -1,0 +1,138 @@
+import errno
+import json
+import os
+import tempfile
+import unittest
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import patch
+from photosort.core import Organizer, folder_for, rename_exclusive
+
+class SafetyTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.base = Path(self.temp.name)
+        self.src, self.dst, self.job = [self.base/p for p in ('source', 'target', 'job')]
+        self.src.mkdir()
+        self.dst.mkdir()
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def create(self, name, payload=b'content'):
+        p = self.src/name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(payload)
+        os.utime(p, (1710000000, 1710000000))
+        return p
+
+    def test_plan_does_not_move_and_preserves_collisions(self):
+        a = self.create('one/file.txt', b'one')
+        b = self.create('two/file.txt', b'two')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst)
+        self.assertTrue(a.exists() and b.exists())
+        self.assertEqual(len({p['destination'] for p in plan['files']}), 2)
+        org.apply()
+        self.assertFalse(a.exists() or b.exists())
+        self.assertEqual({Path(p['destination']).read_bytes() for p in plan['files']}, {b'one', b'two'})
+        org.apply()  # completed job is resumable
+
+    def test_cross_filesystem_copy_and_resume(self):
+        src = self.create('file.txt', b'content'*100)
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst)
+        real = rename_exclusive
+        def cross(source, target):
+            if source == src:
+                raise OSError(errno.EXDEV, 'forced cross-device move')
+            return real(source, target)
+        with patch('photosort.core.rename_exclusive', cross):
+            org.apply()
+        self.assertFalse(src.exists())
+        self.assertEqual(Path(plan['files'][0]['destination']).read_bytes(), b'content'*100)
+        org.apply()
+
+    def test_corrupt_copy_retains_source(self):
+        src = self.create('file.txt', b'original')
+        org = Organizer(self.job)
+        org.plan(self.src, self.dst)
+        real = rename_exclusive
+        def cross(source, target):
+            if source == src:
+                raise OSError(errno.EXDEV, 'forced cross-device move')
+            return real(source, target)
+        real_copy = __import__('shutil').copystat
+        def corrupt(source, target):
+            target.write_bytes(b'corrupt!')
+            real_copy(source, target)
+        with patch('photosort.core.rename_exclusive', cross), patch('photosort.core.shutil.copystat', corrupt):
+            with self.assertRaises(ValueError):
+                org.apply()
+        self.assertEqual(src.read_bytes(), b'original')
+
+    def test_new_destination_never_overwritten(self):
+        src = self.create('file.txt')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst)
+        dest = Path(plan['files'][0]['destination'])
+        dest.parent.mkdir(parents=True)
+        dest.write_bytes(b'other')
+        with self.assertRaises(FileExistsError):
+            org.apply()
+        self.assertTrue(src.exists())
+        self.assertEqual(dest.read_bytes(), b'other')
+
+    def test_partial_copy_can_resume(self):
+        src = self.create('file.txt', b'content'*100)
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst)
+        real = rename_exclusive
+        def cross(source, target):
+            if source == src:
+                raise OSError(errno.EXDEV, 'forced cross-device move')
+            return real(source, target)
+        def stop_after_copy_started():
+            journal = self.job/'journal.jsonl'
+            return journal.exists() and '"status": "copying"' in journal.read_text()
+        with patch('photosort.core.rename_exclusive', cross):
+            with self.assertRaises(InterruptedError):
+                Organizer(self.job, stop=stop_after_copy_started).apply()
+            self.assertTrue(src.exists())
+            Organizer(self.job).apply()
+        self.assertEqual(Path(plan['files'][0]['destination']).read_bytes(), b'content'*100)
+        self.assertFalse(src.exists())
+
+    def test_changed_source_not_moved(self):
+        src = self.create('file.txt')
+        org = Organizer(self.job)
+        org.plan(self.src, self.dst)
+        src.write_bytes(b'changed-longer')
+        with self.assertRaises(ValueError):
+            org.apply()
+        self.assertTrue(src.exists())
+
+    def test_sidecar_in_json_subdirectory_keeps_photo_date(self):
+        photo = self.create('album/img.jpg', b'not-a-real-jpeg')
+        side = self.create('album/json/img.jpg.json', json.dumps({'photoTakenTime': {'timestamp': '946684800'}}).encode())
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst, scope='photos')
+        self.assertEqual(len(plan['files']), 2)
+        self.assertEqual({Path(p['destination']).parent for p in plan['files']}, {self.dst/'2000'/'01'})
+
+    def test_reject_nested_roots_and_path_escape(self):
+        with self.assertRaises(ValueError):
+            Organizer(self.job).plan(self.src, self.src/'dest')
+        with self.assertRaises(ValueError):
+            folder_for(datetime.now(), '../../%Y')
+
+    def test_pause_before_move_retains_source(self):
+        src = self.create('file.txt')
+        org = Organizer(self.job)
+        org.plan(self.src, self.dst)
+        with self.assertRaises(InterruptedError):
+            Organizer(self.job, stop=lambda: True).apply()
+        self.assertTrue(src.exists())
+
+if __name__ == '__main__':
+    unittest.main()

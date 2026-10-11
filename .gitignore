@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+dist/
+build/
+jobs/
+*.sqlite*
+*.log
+*.jsonl
+_vendor/
