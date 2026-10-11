@@ -200,6 +200,34 @@ class SafetyTests(unittest.TestCase):
         self.assertFalse(source.exists())
         self.assertTrue(Path(plan['files'][0]['destination']).is_file())
 
+    def test_cleanup_removes_empty_source_and_nested_folders(self):
+        self.create('nested/deep/photo.jpg')
+        (self.src/'already-empty').mkdir()
+        org = Organizer(self.job)
+        org.plan(self.src,self.dst)
+        org.apply()
+        self.assertFalse(self.src.exists())
+        cleanup = json.loads((self.job/'cleanup.json').read_text(encoding='utf-8'))
+        self.assertIn(str(self.src),cleanup['removed'])
+        org.apply()  # resume remains valid after source directories were removed
+
+    def test_cleanup_retains_nonmedia_and_folder_with_unmoved_file(self):
+        self.create('nested/photo.jpg')
+        keep = self.create('nested/document.pdf')
+        org = Organizer(self.job)
+        org.plan(self.src,self.dst)
+        org.apply()
+        self.assertTrue(keep.exists())
+        self.assertTrue(self.src.exists())
+
+    def test_multiple_scopes_match_union_and_exclude_unselected(self):
+        for name in ('photo.jpg','clip.mp4','music.mp3'):
+            self.create(name)
+        plan = Organizer(self.job).plan(self.src,self.dst,scope='video,audio')
+        self.assertEqual({Path(r['source']).name for r in plan['files']},{'clip.mp4','music.mp3'})
+        with self.assertRaises(ValueError):
+            Organizer(self.base/'no-scope').plan(self.src,self.dst,scope='')
+
     def test_pause_before_move_retains_source(self):
         src = self.create('file.jpg')
         org = Organizer(self.job)
