@@ -236,5 +236,60 @@ class SafetyTests(unittest.TestCase):
             Organizer(self.job, stop=lambda: True).apply()
         self.assertTrue(src.exists())
 
+    def test_resource_exclusions_keep_assets_and_personal_photos(self):
+        keep = [self.create('node_modules/pkg/icon.png'),
+                self.create('Lightroom Previews.lrdata/preview.jpg'),
+                self.create('editor/assets/logo.jpg')]
+        self.create('editor/app.exe')
+        self.create('editor/library.dll')
+        photo = self.create('album/photos/photo.jpg')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst, skip_app_resources=True)
+        self.assertEqual([r['source'] for r in plan['files']], [str(photo)])
+        self.assertEqual(len(plan['skipped_resources']), 3)
+        self.assertTrue(all(r['reason'] for r in plan['skipped_resources']))
+        org.apply()
+        self.assertTrue(all(p.exists() for p in keep))
+
+    def test_resource_opt_in_and_explicit_exclusion(self):
+        self.create('node_modules/icon.png')
+        self.create('album/photo.jpg')
+        plan = Organizer(self.job).plan(self.src, self.dst)
+        self.assertEqual(len(plan['files']), 2)
+        org = Organizer(self.base/'filtered-job')
+        plan = org.plan(self.src, self.dst, exclude_dirs=['album'])
+        self.assertEqual(len(plan['files']), 1)
+        self.assertEqual(plan['skipped_resources'][0]['reason'], 'Katalog pominięty przez użytkownika')
+        with self.assertRaises(ValueError):
+            org.plan(self.src, self.dst, exclude_dirs=['../outside'])
+        with self.assertRaises(ValueError):
+            Organizer(self.job).plan(self.src, self.dst, skip_app_resources=True)
+
+    def test_resource_source_root_is_not_scanned_or_removed(self):
+        self.create('icon.png')
+        self.create('pyvenv.cfg')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst, skip_app_resources=True)
+        self.assertEqual(plan['files'], [])
+        self.assertEqual(plan['source_directories'], [])
+        org.apply()
+        self.assertTrue(self.src.exists())
+
+    def test_remote_passes_resource_exclusions_to_worker(self):
+        from argparse import Namespace
+        from photosort.remote import run
+        args = Namespace(host='user@nas', job='test', source='/volume1/photo',
+                         target='/volume1/homes', status=False, resume=False,
+                         pattern='%Y/%m', scope='photos', timezone='Europe/Warsaw',
+                         extensions=None, apply=False, skip_app_resources=True,
+                         exclude_dir=['My app', 'previews'])
+        with patch('photosort.remote.bundle', return_value=b'bundle'), patch('photosort.remote.subprocess.run') as ssh:
+            run(args)
+        command = ssh.call_args_list[-1].args[0][-1]
+        self.assertIn('--skip-app-resources', command)
+        self.assertIn('--exclude-dir', command)
+        self.assertIn('My app', command)
+        self.assertIn('previews', command)
+
 if __name__ == '__main__':
     unittest.main()
