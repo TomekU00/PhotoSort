@@ -8,6 +8,7 @@ import shutil
 import stat
 import time
 from pathlib import Path
+from .extensions import normalize_extensions, matches
 from .metadata import PHOTOS, VIDEOS, SIDECARS, capture
 
 SKIP = {'@eadir', '#recycle', '$recycle.bin', 'system volume information'}
@@ -85,7 +86,7 @@ class Organizer:
             raise RuntimeError('Zadanie zablokowane: proces działa albo pozostał lock po awarii. Sprawdź proces przed usunięciem lock.')
         return p
 
-    def plan(self, source, target, pattern='%Y/%m', scope='all', timezone='Europe/Warsaw'):
+    def plan(self, source, target, pattern='%Y/%m', scope='all', timezone='Europe/Warsaw', extensions=None):
         from datetime import datetime
         source, target = Path(source).expanduser().resolve(), Path(target).expanduser().resolve()
         if not source.is_dir():
@@ -99,7 +100,10 @@ class Organizer:
         folder_for(datetime.now(), pattern)
         if scope not in ('photos', 'media', 'all'):
             raise ValueError('Nieprawidłowy zakres')
+        extensions = normalize_extensions(extensions)
         config = dict(source=str(source), target=str(target), pattern=pattern, scope=scope, timezone=timezone)
+        if extensions is not None:
+            config['extensions'] = extensions
         if (self.job/'plan.json').exists():
             plan = json.loads((self.job/'plan.json').read_text(encoding='utf-8'))
             if plan['config'] != config:
@@ -135,7 +139,7 @@ class Organizer:
                 p = Path(r['path'])
                 ext = p.suffix.lower().lstrip('.')
                 included = scope == 'all' or ext in PHOTOS or (scope == 'media' and ext in VIDEOS)
-                if included:
+                if included and matches(p, extensions):
                     date, method, errs = capture(p, r['mtime'], timezone, lookup)
                     dates[r['path']] = (date, method)
                     selected.append(r)

@@ -16,6 +16,7 @@ def main(argv=None):
     p.add_argument('--format', default='%Y/%m', dest='pattern')
     p.add_argument('--scope', choices=['photos', 'media', 'all'], default='all')
     p.add_argument('--timezone', default='Europe/Warsaw')
+    p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4; @none: bez rozszerzenia; @other: nierozpoznane')
     for command in ('apply', 'status'):
         p = sub.add_parser(command)
         p.add_argument('--job', required=True)
@@ -30,6 +31,7 @@ def main(argv=None):
     p.add_argument('--format', default='%Y/%m', dest='pattern')
     p.add_argument('--scope', choices=['photos', 'media', 'all'], default='all')
     p.add_argument('--timezone', default='Europe/Warsaw')
+    p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4; @none: bez rozszerzenia; @other: nierozpoznane')
     p.add_argument('--apply', action='store_true', help='Po planowaniu rozpocznij przenoszenie')
     p.add_argument('--resume', action='store_true', help='Uruchom apply dla istniejącego planu')
     p.add_argument('--wait', action='store_true', help='Pozostaw terminal otwarty do naciśnięcia Enter')
@@ -61,7 +63,7 @@ def main(argv=None):
     org = Organizer(args.job, notify, lambda: stopped[0])
     try:
         if args.command == 'plan':
-            org.plan(args.source, args.target, args.pattern, args.scope, args.timezone)
+            org.plan(args.source, args.target, args.pattern, args.scope, args.timezone, args.extensions)
         else:
             org.apply()
     except InterruptedError:

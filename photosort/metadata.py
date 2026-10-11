@@ -9,8 +9,8 @@ import exifread
 import pytz
 
 logging.getLogger('exifread').setLevel(logging.ERROR)
-PHOTOS = set('jpg jpeg jpe jfif png tif tiff heic heif hif avif webp gif bmp jxl jp2 psd psb dng cr2 cr3 crw nef nrw arw srf sr2 raf orf rw2 rwl raw pef srw x3f 3fr fff iiq kdc dcr erf mef mos mrw hdr exr'.split())
-VIDEOS = set('mp4 mov m4v mkv avi mts m2ts ts mpg mpeg m2v webm wmv flv 3gp 3g2 vob ogv mod tod mxf r3d braw'.split())
+PHOTOS = set('jpg jpeg jpe jfif png tif tiff heic heif hif avif webp gif bmp jxl jp2 j2k jpf jpx psd psb dng cr2 cr3 crw nef nrw arw srf sr2 raf orf rw2 rwl raw pef ptx srw x3f 3fr fff iiq k25 kdc dcr erf mef mos mrw bay cap eip mpo jxr wdp hd hdr exr pic pnm ppm pgm pbm pam tga pcx ico icns svg eps ai'.split())
+VIDEOS = set('264 265 3g2 3gp 3gpp 3gpp2 amv asf av1 avi bik bk2 braw cine crm dav dif divx dv dvr-ms f4b f4p f4v flv gxf h264 h265 hevc ivf m1v m2p m2t m2ts m2v m4v mjpeg mjpg mkv mod mov mp4 mpe mpeg mpg mts mxf nsv nut ogm ogv qt r3d rec rm rmvb roq rv smk tod tp trp ts vob vp8 vp9 vro webm wmv wmx wtv wvx xvid y4m'.split())
 SIDECARS = set('json xmp dop acr aae pp3 cos cof nksc'.split())
 
 def parse(value):

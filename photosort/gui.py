@@ -9,6 +9,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from .core import Organizer
+from .extensions import GROUPS, normalize_extensions
 
 def main():
     root = tk.Tk()
@@ -40,6 +41,68 @@ def main():
     row('Cel', 'target', True)
     row('Format folderów', 'pattern', choices=['%Y/%m', '%Y/%m/%d', '%Y-%m', '%Y'])
     row('Zakres', 'scope', choices=['all', 'media', 'photos'])
+    extension_state = {'values': None}
+    extension_label = tk.StringVar(value='Wszystkie rozszerzenia (według zakresu)')
+    def choose_extensions():
+        dialog = tk.Toplevel(root)
+        dialog.title('Wybierz rozszerzenia')
+        dialog.geometry('760x580')
+        dialog.transient(root)
+        dialog.grab_set()
+        ttk.Label(dialog, text='Zaznacz grupę lub pojedyncze rozszerzenia. Możesz wybrać kilka grup.', padding=12).pack(anchor='w')
+        group_choice = ttk.Combobox(dialog, values=list(GROUPS), state='readonly')
+        group_choice.pack(fill='x', padx=12, pady=(0,8))
+        group_choice.current(0)
+        ttk.Style(dialog).layout('Extensions.TNotebook.Tab', [])
+        tabs = ttk.Notebook(dialog, style='Extensions.TNotebook')
+        group_choice.bind('<<ComboboxSelected>>', lambda event: tabs.select(group_choice.current()))
+        tabs.pack(fill='both', expand=True, padx=12)
+        selected = extension_state['values']
+        toggles = {}
+        for name, values in GROUPS.items():
+            panel = ttk.Frame(tabs, padding=10)
+            tabs.add(panel, text=name)
+            local = []
+            for n, ext in enumerate(sorted(values)):
+                value = tk.BooleanVar(value=selected is None or ext in selected)
+                toggles[ext] = value
+                local.append(value)
+                text = {'@none': 'Bez rozszerzenia', '@other': 'Nierozpoznane rozszerzenia'}.get(ext, ext.upper())
+                ttk.Checkbutton(panel, text=text, variable=value).grid(row=n//5+1, column=n%5, sticky='w', padx=8, pady=4)
+            controls = ttk.Frame(panel)
+            controls.grid(row=0, column=0, columnspan=5, sticky='w', pady=(0,10))
+            def set_group(items, flag):
+                for item in items:
+                    item.set(flag)
+            ttk.Button(controls, text='Zaznacz grupę', command=lambda items=local: set_group(items, True)).pack(side='left')
+            ttk.Button(controls, text='Odznacz grupę', command=lambda items=local: set_group(items, False)).pack(side='left', padx=8)
+        custom = tk.StringVar(value=','.join(ext for ext in selected or [] if ext not in toggles))
+        ttk.Label(dialog, text='Własne rozszerzenia, oddzielone przecinkiem:').pack(anchor='w', padx=12, pady=(10,0))
+        ttk.Entry(dialog, textvariable=custom).pack(fill='x', padx=12)
+        ttk.Label(dialog, text='JSON/XMP i pozostałe rozpoznane pliki towarzyszące wybranym zdjęciom jadą razem z nimi.', wraplength=720).pack(anchor='w', padx=12, pady=8)
+        footer = ttk.Frame(dialog, padding=12)
+        footer.pack(fill='x')
+        def confirm():
+            try:
+                values = [ext for ext, value in toggles.items() if value.get()]
+                values += normalize_extensions(custom.get()) if custom.get().strip() else []
+                extension_state['values'] = normalize_extensions(values)
+                variables['scope'].set('all')
+                extension_label.set('Wybrane rozszerzenia: '+str(len(extension_state['values'])))
+                dialog.destroy()
+            except ValueError as e:
+                messagebox.showerror('Rozszerzenia', str(e), parent=dialog)
+        def all_files():
+            extension_state['values'] = None
+            extension_label.set('Wszystkie rozszerzenia (według zakresu)')
+            dialog.destroy()
+        ttk.Button(footer, text='Odznacz wszystko', command=lambda: [v.set(False) for v in toggles.values()]).pack(side='left')
+        ttk.Button(footer, text='Wszystkie pliki', command=all_files).pack(side='left', padx=8)
+        ttk.Button(footer, text='Zapisz wybór', command=confirm).pack(side='right')
+    extension_row = ttk.Frame(box)
+    extension_row.pack(fill='x', pady=5)
+    ttk.Button(extension_row, text='Wybierz rozszerzenia…', command=choose_extensions).pack(side='left')
+    ttk.Label(extension_row, textvariable=extension_label).pack(side='left', padx=12)
     ttk.Label(box, text='all: wszystkie pliki · media: zdjęcia i filmy · photos: zdjęcia\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
     ttk.Label(box, text='Lokalnie → lokalnie: wybierz dwa foldery na komputerze.\nSSH: wpisz adres NAS i nazwę użytkownika DSM. Hasło wpisujesz w osobnym terminalu;\nznaki hasła nie są widoczne. Przy pierwszym połączeniu sprawdź klucz serwera.').pack(anchor='w', pady=4)
     actions_ssh = ttk.Frame(box)
@@ -79,6 +142,8 @@ def main():
         job = Path(jobvar.get()).name
         args = prefix() + ['remote', ssh_host(), variables['source'].get(), variables['target'].get(),
                 '--wait', '--job', job, '--format', variables['pattern'].get(), '--scope', variables['scope'].get()]
+        if extension_state['values'] is not None:
+            args += ['--extensions', ','.join(extension_state['values'])]
         if action == 'apply':
             args += ['--resume']
         terminal(args)
@@ -94,11 +159,12 @@ def main():
         stopped.clear()
         job = jobvar.get()
         settings = {key: value.get() for key, value in variables.items()}
+        extensions = list(extension_state['values']) if extension_state['values'] is not None else None
         def worker():
             try:
                 org = Organizer(job, events.put, stopped.is_set)
                 if action == 'plan':
-                    plan = org.plan(settings['source'], settings['target'], settings['pattern'], settings['scope'])
+                    plan = org.plan(settings['source'], settings['target'], settings['pattern'], settings['scope'], extensions=extensions)
                     events.put({'message': 'Plan: {} plików, {:.2f} GB. Ostrzeżenia metadanych: {}. Plan zapisany w katalogu zadania.'.format(len(plan['files']), plan['bytes']/1e9, len(plan['warnings']))})
                 else:
                     org.apply()
@@ -120,6 +186,8 @@ def main():
             p = Path(path)/'plan.json'
             if p.exists():
                 config = json.loads(p.read_text(encoding='utf-8'))['config']
+                extension_state['values'] = config.get('extensions')
+                extension_label.set('Wybrane rozszerzenia: '+str(len(config['extensions'])) if config.get('extensions') is not None else 'Wszystkie rozszerzenia (według zakresu)')
                 for key in ('source', 'target', 'pattern', 'scope'):
                     variables[key].set(config[key])
     ttk.Button(actions, text='Otwórz zadanie', command=load).pack(side='right')

@@ -59,6 +59,9 @@ def run(args):
     else:
         command = ('python3 '+app+'/__main__.py plan '+shlex.quote(args.source)+' '+shlex.quote(args.target)+flags+
                    ' --format '+shlex.quote(args.pattern)+' --scope '+shlex.quote(args.scope)+' --timezone '+shlex.quote(args.timezone))
+        if args.extensions is not None:
+            from .extensions import normalize_extensions
+            command += ' --extensions '+shlex.quote(','.join(normalize_extensions(args.extensions)))
         if args.apply:
             command += ' && python3 '+app+'/__main__.py apply'+flags
     # Detach on server; a broken connection or closed PC does not stop the worker.
