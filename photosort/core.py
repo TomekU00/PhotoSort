@@ -1,52 +1,18 @@
 """Immutable plans and durable, exclusive, verified file moves."""
-import ctypes
 import errno
 import hashlib
 import json
 import os
 import shutil
-import stat
 import time
 from pathlib import Path
 from .extensions import GROUPS, normalize_extensions, matches, scope_categories
 from .metadata import PHOTOS, VIDEOS, SIDECARS, capture
 from .resources import resource_reason
+from .filesystem import save, syncdir, rename_exclusive, FileMover, cleanup_empty_directories
+from .journal import Journal, plan_identity
 
 SKIP = {'@eadir', '#recycle', '$recycle.bin', 'system volume information'}
-
-def save(path, value):
-    temp = path.with_suffix('.tmp')
-    with temp.open('w', encoding='utf-8') as f:
-        json.dump(value, f, ensure_ascii=False, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-    os.replace(temp, path)
-    syncdir(path.parent)
-
-def syncdir(path):
-    if os.name == 'nt':
-        return
-    fd = os.open(str(path), os.O_RDONLY | os.O_DIRECTORY)
-    try:
-        os.fsync(fd)
-    finally:
-        os.close(fd)
-
-def rename_exclusive(source, target):
-    if os.name == 'nt':
-        return os.rename(source, target)
-    libc = ctypes.CDLL(None, use_errno=True)
-    if hasattr(libc, 'renameat2'):
-        fn = libc.renameat2
-        fn.restype = ctypes.c_int
-        if fn(-100, ctypes.c_char_p(os.fsencode(source)), -100, ctypes.c_char_p(os.fsencode(target)), 1):
-            n = ctypes.get_errno()
-            raise OSError(n, os.strerror(n), str(target))
-    else:
-        # link is exclusive; unlink only after the new entry is durable.
-        os.link(source, target)
-        syncdir(target.parent)
-        source.unlink()
 
 def folder_for(date, pattern):
     if not pattern or len(pattern) > 120:
@@ -254,155 +220,32 @@ class Organizer:
 
     def apply(self):
         plan = json.loads((self.job/'plan.json').read_text(encoding='utf-8'))
-        identity = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
         source_root, target_root = (Path(plan['config'][k]).resolve() for k in ('source', 'target'))
-        journal = self.job/'journal.jsonl'
+        journal = Journal(self.job/'journal.jsonl', plan_identity(plan))
         lock = self.lock()
-        prior, done = {}, 0
+        done = 0
         total = len(plan['files'])
         try:
-            if journal.exists():
-                with journal.open('rb') as f:
-                    cut = None
-                    while True:
-                        offset = f.tell()
-                        line = f.readline()
-                        if not line:
-                            break
-                        try:
-                            event = json.loads(line)
-                        except (ValueError, UnicodeDecodeError):
-                            if f.read(1):
-                                raise
-                            (self.job/'partial-journal.txt').write_bytes(line)
-                            cut = offset
-                            break
-                        if event['plan_id'] != identity:
-                            raise ValueError('Dziennik należy do innego planu')
-                        prior[event['source']] = event
-                if cut is not None:
-                    with journal.open('r+b') as f:
-                        f.truncate(cut)
-            def valid(path, item):
-                s = path.lstat()
-                if not stat.S_ISREG(s.st_mode) or s.st_size != item['size'] or abs(s.st_mtime-item['mtime']) > .002:
-                    raise ValueError('Plik zmieniony: '+str(path))
-                return s
-            def digest(path):
-                h = hashlib.sha256()
-                with path.open('rb') as f:
-                    while True:
-                        if self.stop():
-                            raise InterruptedError('Przerwano; źródło zachowane')
-                        b = f.read(4*1024*1024)
-                        if not b:
-                            break
-                        h.update(b)
-                return h.hexdigest()
+            journal.replay()
+            mover = FileMover(source_root, target_root, journal, self.stop,
+                              rename=rename_exclusive, sync=syncdir)
             self.status('preflight', 0, total)
             for n, item in enumerate(plan['files'], 1):
                 if self.stop():
                     raise InterruptedError('Przerwano')
-                src, dst = Path(item['source']), Path(item['destination'])
-                src.parent.resolve().relative_to(source_root)
-                dst.parent.resolve().relative_to(target_root)
-                event = prior.get(str(src))
-                if src.exists():
-                    valid(src, item)
-                    if dst.exists() and not (event and event['status'] in ('copy_ready', 'copied', 'linked')):
-                        raise FileExistsError(str(dst))
-                else:
-                    if not event:
-                        raise FileNotFoundError(str(src))
-                    s = valid(dst, item)
-                    if event.get('sha256'):
-                        if digest(dst) != event['sha256']:
-                            raise ValueError('Błąd sumy kontrolnej: '+str(dst))
-                    elif (s.st_dev, s.st_ino) != (event['device'], event['inode']):
-                        raise ValueError('Nie można potwierdzić poprzedniego przeniesienia')
+                if mover.preflight(item):
                     done += 1
                 if n % 64 == 0 or n == total:
                     self.status('preflight', n, total)
             self.started = time.monotonic()
             initial_done = done
-            with journal.open('a', encoding='utf-8') as log:
-                def record(item, status, **extra):
-                    event = dict(item, status=status, plan_id=identity, **extra)
-                    log.write(json.dumps(event, ensure_ascii=False)+'\n')
-                    log.flush()
-                    os.fsync(log.fileno())
-                    prior[item['source']] = event
+            with journal.writer():
                 for item in plan['files']:
                     if self.stop():
                         raise InterruptedError('Przerwano')
-                    src, dst = Path(item['source']), Path(item['destination'])
-                    if not src.exists():
+                    if not mover.move(item):
                         continue
-                    s = valid(src, item)
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    dst.parent.resolve().relative_to(target_root)
-                    old = prior.get(str(src))
-                    if dst.exists():
-                        if not old or old['status'] not in ('copy_ready', 'copied', 'linked'):
-                            raise FileExistsError(str(dst))
-                        if old.get('sha256'):
-                            if digest(src) != old['sha256'] or digest(dst) != old['sha256']:
-                                raise ValueError('Wznowienie: kopia niezgodna')
-                        elif dst.stat().st_ino != s.st_ino:
-                            raise ValueError('Wznowienie: inny plik')
-                        valid(src, item)
-                        src.unlink()
-                        syncdir(src.parent)
-                        record(item, 'moved', **{k: old[k] for k in ('sha256', 'device', 'inode') if k in old})
-                    else:
-                        record(item, 'intent', inode=s.st_ino, device=s.st_dev,
-                               **({'temporary': old['temporary']} if old and old.get('temporary') else {}))
-                        try:
-                            rename_exclusive(src, dst)
-                        except OSError as e:
-                            if e.errno != errno.EXDEV and getattr(e, 'winerror', None) != 17:
-                                raise
-                            if shutil.disk_usage(dst.parent).free < item['size'] + 64*1024*1024:
-                                raise OSError('Za mało miejsca na następny plik')
-                            tmp = dst.parent/('.photosort-'+identity[:12]+'-'+hashlib.sha256(str(src).encode()).hexdigest()[:16]+'.part')
-                            if tmp.exists():
-                                if not old or old['status'] not in ('intent', 'copying', 'copy_ready') or old.get('temporary') != str(tmp):
-                                    raise FileExistsError('Nieznany plik tymczasowy: '+str(tmp))
-                                valid(src, item)
-                                tmp.unlink()
-                            record(item, 'copying', temporary=str(tmp), inode=s.st_ino, device=s.st_dev)
-                            h = hashlib.sha256()
-                            with src.open('rb') as inp, tmp.open('xb') as out:
-                                while True:
-                                    if self.stop():
-                                        raise InterruptedError('Przerwano kopiowanie; źródło zachowane')
-                                    b = inp.read(4*1024*1024)
-                                    if not b:
-                                        break
-                                    out.write(b)
-                                    h.update(b)
-                                out.flush()
-                                os.fsync(out.fileno())
-                            shutil.copystat(src, tmp)
-                            valid(src, item)
-                            valid(tmp, item)
-                            checksum = h.hexdigest()
-                            if digest(src) != checksum or digest(tmp) != checksum:
-                                raise ValueError('Kopia niezgodna; źródło zachowane')
-                            record(item, 'copy_ready', sha256=checksum, temporary=str(tmp))
-                            rename_exclusive(tmp, dst)
-                            syncdir(dst.parent)
-                            record(item, 'copied', sha256=checksum)
-                            src.unlink()
-                            syncdir(src.parent)
-                            record(item, 'moved', sha256=checksum)
-                        else:
-                            syncdir(dst.parent)
-                            syncdir(src.parent)
-                            d = valid(dst, item)
-                            record(item, 'moved', inode=d.st_ino, device=d.st_dev)
                     done += 1
-                    # Rate is measured for this run, not previous completed files.
                     elapsed = time.monotonic()-self.started
                     speed = (done-initial_done)/elapsed if elapsed else 0
                     self.status('moving', done, total, rate_current=round(speed, 2),
@@ -410,42 +253,12 @@ class Organizer:
             for n, item in enumerate(plan['files'], 1):
                 if Path(item['source']).exists():
                     raise ValueError('Źródło nadal istnieje: '+item['source'])
-                valid(Path(item['destination']), item)
+                mover.valid(Path(item['destination']), item)
                 if n % 64 == 0 or n == total:
                     self.status('verifying', n, total)
             save(self.job/'verification.json', dict(files=total, bytes=plan['bytes'], errors=0))
             self.status('cleanup', total, total)
-            directories = {Path(p) for p in plan.get('source_directories', [])}
-            for item in plan['files']:
-                parent = Path(item['source']).parent
-                while parent != source_root.parent:
-                    directories.add(parent)
-                    if parent == source_root:
-                        break
-                    parent = parent.parent
-            removed, cleanup_errors = [], []
-            for directory in sorted(directories, key=lambda p: len(p.parts), reverse=True):
-                if self.stop():
-                    raise InterruptedError('Przerwano sprzątanie')
-                try:
-                    directory.relative_to(source_root)
-                    # Never delete a drive/share/mount root or the destination tree.
-                    if directory == Path(directory.anchor) or os.path.ismount(directory):
-                        continue
-                    try:
-                        directory.relative_to(target_root)
-                        continue
-                    except ValueError:
-                        pass
-                    if directory.is_symlink():
-                        continue
-                    directory.rmdir()  # Atomic: refuses directories containing any files.
-                    removed.append(str(directory))
-                except FileNotFoundError:
-                    pass
-                except OSError as e:
-                    if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
-                        cleanup_errors.append(dict(path=str(directory), error=str(e)))
+            removed, cleanup_errors = cleanup_empty_directories(plan, source_root, target_root, self.stop)
             save(self.job/'cleanup.json', dict(removed=removed, warnings=cleanup_errors))
             self.status('complete', total, total, removed_empty_directories=len(removed), cleanup_warnings=len(cleanup_errors))
         except InterruptedError:
