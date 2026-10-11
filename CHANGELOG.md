@@ -1,8 +1,16 @@
 # Changelog PhotoSort
 
-Historia zmian aplikacji do wersji 0.1.8. Wersje 0.1.2–0.1.5 były etapami rozwoju bez osobnych wydań GitHub.
+Historia zmian aplikacji do wersji 0.1.9. Wersje 0.1.2–0.1.5 były etapami rozwoju bez osobnych wydań GitHub.
 
 ## Niewydane
+
+## 0.1.9 - 11 października 2026
+
+- Identyczne pliki pod pierwotną lub zaplanowaną nazwą docelową są rozpoznawane po rozmiarze i SHA-256 i przenoszone do Duplikaty w źródle.
+- Zachowanie względnych ścieżek oraz plików towarzyszących; wspólna grupa RAW/JPEG jest odkładana tylko wtedy, gdy wszystkie jej multimedia mają kopie w celu.
+- Pomijanie folderu Duplikaty przy kolejnych skanowaniach i trwały raport duplicates.json powiązany z planem.
+- Obsługa wcześniejszych zapisanych planów oraz wznowienia przerwanego przenoszenia; brak nadpisywania w Duplikaty.
+- Osiem testów regresji. Walidacja: 67 testów oraz budowa i test rozpakowanej paczki Windows w CI.
 
 ## 0.1.8 - 11 października 2026
 
@@ -83,4 +91,4 @@ Historia zmian aplikacji do wersji 0.1.8. Wersje 0.1.2–0.1.5 były etapami roz
 
 ## Zakres historii
 
-Wcześniejsze jednorazowe skrypty NAS, galeria WWW i pomysły na deduplikację były genezą projektu, ale nie stanowią funkcji PhotoSort 0.1.6. Aplikacja nie oferuje obecnie deduplikacji, galerii GPS, automatycznego pobierania Google Photos ani automatycznego cofnięcia wszystkich operacji.
+Wcześniejsze jednorazowe skrypty NAS, galeria WWW i pomysły na deduplikację były genezą projektu, ale nie stanowią funkcji PhotoSort 0.1.6. Aplikacja nie oferuje globalnego wyszukiwania duplikatów pod dowolnymi nazwami, galerii GPS, automatycznego pobierania Google Photos ani automatycznego cofnięcia wszystkich operacji.
