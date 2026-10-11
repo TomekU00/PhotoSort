@@ -26,6 +26,37 @@ class SafetyTests(unittest.TestCase):
         os.utime(p, (1710000000, 1710000000))
         return p
 
+    def test_extension_filter_keeps_companions_and_unselected_sources(self):
+        photo = self.create('capture.JPG')
+        sidecar = self.create('capture.JPG.json', b'{"photoTakenTime":{"timestamp":"1710000000"}}')
+        video = self.create('clip.mp4')
+        text = self.create('note.txt')
+        org = Organizer(self.job)
+        plan = org.plan(self.src, self.dst, extensions='.JPG')
+        self.assertEqual({Path(r['source']).name for r in plan['files']}, {'capture.JPG', 'capture.JPG.json'})
+        self.assertEqual(plan['config']['extensions'], ['jpg'])
+        org.apply()
+        self.assertFalse(photo.exists() or sidecar.exists())
+        self.assertTrue(video.exists() and text.exists())
+
+    def test_unknown_and_extensionless_filters(self):
+        self.create('unknown.weirdformat')
+        self.create('LICENSEFILE')
+        self.create('known.txt')
+        plan = Organizer(self.job).plan(self.src, self.dst, extensions='@none,@other')
+        self.assertEqual({Path(r['source']).name for r in plan['files']}, {'unknown.weirdformat', 'LICENSEFILE'})
+
+    def test_extension_filter_is_immutable_and_old_plan_still_loads(self):
+        self.create('note.txt')
+        org = Organizer(self.job)
+        original = org.plan(self.src, self.dst)
+        self.assertNotIn('extensions', original['config'])
+        self.assertEqual(org.plan(self.src, self.dst), original)
+        with self.assertRaises(ValueError):
+            org.plan(self.src, self.dst, extensions='txt')
+        with self.assertRaises(ValueError):
+            Organizer(self.base/'empty-selection').plan(self.src, self.dst, extensions=[])
+
     def test_plan_does_not_move_and_preserves_collisions(self):
         a = self.create('one/file.txt', b'one')
         b = self.create('two/file.txt', b'two')
