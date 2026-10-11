@@ -1,5 +1,13 @@
 # Changelog PhotoSort
 
+## Niewydane - pomijanie zasobów aplikacji
+
+- Opcja GUI i CLI `--skip-app-resources`, przekazywana również do planowania przez SSH.
+- Rozpoznawanie znanych katalogów programów, środowisk Python, pakietów .app, podglądów Lightroom oraz katalogów z EXE i DLL.
+- Wielokrotne `--exclude-dir` do ręcznego wykluczania drzew katalogów wewnątrz źródła.
+- Raport przyczyn `skipped_resources` w planie; niezmienność wcześniejszych planów i domyślnie wyłączony filtr.
+- Walidacja: 22 testy, w tym pomijanie drzew aplikacji, zachowanie zwykłych zdjęć i przekazywanie opcji do procesu SSH.
+
 Historia zmian aplikacji do wersji 0.1.6. Wersje 0.1.2–0.1.5 były etapami rozwoju na gałęzi głównej, bez osobnych wydań GitHub. Dokumentacja została uzupełniona 11 października 2026; nie zmienia to wersji programu.
 
 ## 0.1.6

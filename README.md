@@ -1,5 +1,23 @@
 # PhotoSort
 
+## Pomijanie zasobów aplikacji
+
+W oknie zaznacz **Pomijaj zasoby aplikacji i podglądy Lightroom** przed utworzeniem nowego planu. Domyślnie opcja jest wyłączona, aby starsze zadania zachowały dotychczasowy wybór. Terminal:
+
+```powershell
+photosort plan "C:\Users\uzytkownik\Desktop" "Z:\Kolekcja" --job ./nowe-zadanie --skip-app-resources --exclude-dir "Moja aplikacja" --exclude-dir "Miniatury"
+```
+
+SSH (polecenie na komputerze, katalogi na NAS):
+
+```sh
+photosort remote uzytkownik@NAS /volume1/photo /volume1/homes --job import2 --skip-app-resources --exclude-dir 'Moja aplikacja'
+```
+
+`--skip-app-resources` pomija znane katalogi instalacji, środowisk i pakietów (m.in. Program Files, Windows, node_modules, .venv, .git), pakiety .app, podglądy .lrdata, katalogi z pyvenv.cfg oraz katalogi zawierające jednocześnie EXE i DLL. Nie pomija zdjęć tylko dlatego, że są małe albo mają rozszerzenie PNG. Rozpoznawanie jest heurystyczne: nie wykrywa każdej aplikacji. `--exclude-dir` można podawać wielokrotnie, jako ścieżkę względną wobec źródła lub bezwzględną wewnątrz źródła. Pomijane jest całe drzewo katalogu. Przyczyny zapisuje `skipped_resources` w `plan.json`. Istniejące plany nie zmieniają się; utwórz nowe zadanie, aby zastosować filtr.
+
+## O aplikacji
+
 Prosty program do porządkowania zdjęć, RAW, filmów i dźwięku według dat.
 Okno działa na Windows i Linux. Te same operacje można uruchamiać z terminala oraz
 przez SSH bezpośrednio na NAS. Python 3.8 lub nowszy; GUI wymaga Tkinter.
