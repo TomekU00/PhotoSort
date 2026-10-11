@@ -124,3 +124,16 @@ potwierdzają zachowania każdego serwera SMB ani wszystkich odmian metadanych.
 Kliknij **Sprawdź logowanie SSH**. W terminalu wpisz hasło użytkownika DSM i Enter — znaki hasła nie są wyświetlane. Przy pierwszym połączeniu sprawdź odcisk klucza serwera przed zaakceptowaniem. Wynik `Python 3.8.15` oznacza, że logowanie i dostęp do Pythona działają. Terminal czeka na Enter przed zamknięciem. Linux pokazuje polecenie do uruchomienia we własnym terminalu.
 
 Test logowania nie uruchamia przenoszenia. Tworzenie planu i wznowienie otwierają osobne połączenia SSH, więc mogą ponownie poprosić o hasło. Hasło nie jest zapisywane przez PhotoSort.
+
+## Wybór rozszerzeń
+
+Przycisk **Wybierz rozszerzenia…** otwiera grupy: zdjęcia i grafika, RAW, filmy, pliki towarzyszące, dźwięk, dokumenty, archiwa, katalogi fotograficzne oraz pozostałe formaty z wcześniejszego sortowania. Każdą grupę i każde rozszerzenie można zaznaczyć osobno. Można dopisać własne rozszerzenia, wybrać pliki bez rozszerzenia lub nierozpoznane formaty. **Wszystkie pliki** wyłącza filtr rozszerzeń.
+
+Zapisanie wyboru w oknie ustawia zakres `all`, aby wybrane formaty nie były odrzucone przez poprzedni zakres. Późniejszy wybór zakresu zawęża filtr. Terminal i SSH używają tego samego filtra:
+
+```sh
+photosort plan /zrodlo /cel --job ./zadanie --extensions jpg,cr3,mp4
+photosort remote Tomek@NAS /volume1/photo /volume1/homes --job import2 --extensions jpg,cr3,mp4
+```
+
+`@none` oznacza pliki bez rozszerzenia, `@other` rozszerzenia spoza znanych list. Filtr nie zmienia organizacji docelowej: nadal używany jest wybrany format dat. JSON/XMP i inne rozpoznane pliki towarzyszące wybranym zdjęciom lub filmom są dołączane automatycznie, nawet jeśli nie zaznaczono ich rozszerzenia. Wybór zapisuje się w niezmiennym planie; zmiana filtra wymaga nowego zadania.
