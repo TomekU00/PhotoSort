@@ -85,8 +85,7 @@ sieciowym. Przycisk zatrzymania w GUI dotyczy wyłącznie zadań lokalnych.
 ## Bezpieczeństwo i wznowienie
 
 Plan jest stały. Kolizje nazw otrzymują wspólny sufiks dla zdjęć i towarzyszących
-plików. Istniejące pliki nigdy nie są nadpisywane. Nie ma deduplikacji ani
-automatycznego usuwania pustych folderów w tej wersji.
+plików. Istniejące pliki nigdy nie są nadpisywane. Nie ma deduplikacji. Po zakończeniu weryfikacji program usuwa puste katalogi źródłowe od najgłębszych do samego źródła. Używa wyłącznie `rmdir`, więc katalog zawierający pliki pozostaje. Folder docelowy i główne katalogi dysków, udziałów oraz punktów montowania są chronione. Wynik sprzątania jest zapisany w `cleanup.json`.
 
 Przenoszenie na tym samym systemie plików używa operacji bez nadpisania.
 Między systemami plików program zapisuje kopię tymczasową, sprawdza SHA-256
@@ -137,3 +136,13 @@ photosort remote Tomek@NAS /volume1/photo /volume1/homes --job import2 --extensi
 ```
 
 JSON/XMP i inne rozpoznane metadane wybranych zdjęć lub filmów są automatycznie dołączane. Nie są osobną kategorią do sortowania. Filtr zapisuje się w planie; zmiana wyboru wymaga nowego zadania. Dawne plany pozostają niezmienione — po aktualizacji utwórz nowy plan, aby zastosować ograniczenie do multimediów.
+
+## Windows EXE i zakres wielokrotnego wyboru
+
+Rozpakuj paczkę Windows i uruchom **PhotoSort.exe**. Python i zależności są dołączone. **PhotoSort-Terminal.exe** jest wersją konsolową oraz otwiera widoczne logowanie SSH z okna; zachowaj go obok głównego EXE i katalogu `_internal`.
+
+Zakres to niezależne pola **Zdjęcia i RAW**, **Filmy**, **Dźwięk**. Możesz wybrać dowolną kombinację. W terminalu: `--scope photos,video` lub `--scope video,audio`. Wybór rozszerzeń dodatkowo zawęża zakres.
+
+Po pomyślnej weryfikacji przenosin program sprząta puste katalogi źródłowe, również źródło, jeżeli jest puste. Pliki niewybrane i dokumenty pozostają, więc zawierające je foldery nie zostaną usunięte. Katalog docelowy wewnątrz źródła jest chroniony.
+
+Budowa EXE: `python -m pip install . pyinstaller pillow`, a następnie `powershell -File build-windows.ps1`. Ikona PS jest lokalnym rysunkiem; źródła i skrypt jej generowania są w `PhotoSort.svg` i `make-icon.py` (ICO/PNG powstają w `assets/`).

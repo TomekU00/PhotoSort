@@ -9,3 +9,8 @@ jobs/
 *.log
 *.jsonl
 _vendor/
+
+*.spec
+
+assets/*.ico
+assets/*.png
