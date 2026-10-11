@@ -12,7 +12,7 @@ archive = Path(sys.argv[1]).resolve()
 expected = Path(str(archive) + '.sha256').read_text().split()[0]
 assert hashlib.sha256(archive.read_bytes()).hexdigest() == expected
 with tempfile.TemporaryDirectory(prefix='PhotoSort package ') as directory:
-    base = Path(directory)
+    base = Path(directory).resolve()
     with zipfile.ZipFile(archive) as bundle:
         bundle.extractall(base)
     package = base / 'PhotoSort'
@@ -35,7 +35,7 @@ with tempfile.TemporaryDirectory(prefix='PhotoSort package ') as directory:
     plan = json.loads(plan_bytes)
     assert len(plan['files']) == 2 and photo.exists()
     destination = Path(next(row['destination'] for row in plan['files']
-                            if row['source'] == str(photo)))
+                            if Path(row['source']).resolve() == photo.resolve()))
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_bytes(b'existing destination')
     run('apply', '--job', job, success=False)
