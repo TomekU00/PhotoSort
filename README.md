@@ -41,7 +41,7 @@ python launch.py plan "D:\Zdjecia" "Z:\Kolekcja" --job ".\zadanie" --format "%Y/
 python launch.py apply --job ".\zadanie"
 ```
 
-Źródło i cel muszą być oddzielnymi katalogami. Dysk lokalny → udział sieciowy
+Cel może być podkatalogiem źródła, np. `Desktop` → `Desktop/posegregowane`. Cały folder docelowy jest pomijany przy skanowaniu, również przy kolejnym zadaniu. Źródło i cel nie mogą być identyczne; cel nie może być katalogiem nadrzędnym źródła. Dysk lokalny → udział sieciowy
 korzysta z kopiowania i weryfikacji przed usunięciem źródła.
 
 ## SSH — operacja na NAS
