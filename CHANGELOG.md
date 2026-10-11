@@ -4,6 +4,10 @@ Historia zmian aplikacji do wersji 0.1.7. Wersje 0.1.2–0.1.5 były etapami roz
 
 ## Niewydane
 
+- Refaktor w trzech etapach: testy granic odzyskiwania; osobne moduły dziennika i operacji plikowych; etapy planowania oraz kontroler lokalnych zadań GUI.
+- Zachowanie formatu version=1, identyfikatorów planów, zdarzeń dziennika i kolejności trwałych zapisów; bez migracji istniejących zadań.
+- Testy GUI, równoległego uruchomienia, zatrzymania i wznowienia oraz samodzielnego payloadu SSH.
+
 - Automatyczna paczka Windows x64 w GitHub Actions, ZIP i SHA-256 jako artefakty oraz załączniki opublikowanych wydań.
 - Test rozpakowanych EXE: GUI, CLI, brak nadpisania, pliki towarzyszące i wznowienie tego samego zadania.
 - Dokumentacja budowania i publikacji; bez zmian w mechanizmach przenoszenia i dzienniku.

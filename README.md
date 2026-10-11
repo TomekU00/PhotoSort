@@ -182,3 +182,7 @@ python scripts/smoke-windows.py dist/PhotoSort-0.1.7-windows-x64.zip
 ```
 
 Używaj świeżego katalogu wyjściowego. Rozpakuj cały ZIP, zachowując strukturę `PhotoSort/`. Paczka nie zawiera zadań użytkownika; aktualizacja nie zmienia planów i dzienników w `~/.photosort/jobs/`. Wznawiaj przez `apply --job` dla tego samego zadania. Test paczki korzysta wyłącznie z tymczasowych danych syntetycznych.
+
+## Rozwój i zgodność zadań
+
+`core.py` koordynuje zadanie; `planning.py` zawiera etapy tworzenia planu, `journal.py` trwały dziennik, a `filesystem.py` kontrolę plików i przenoszenie. GUI używa osobnego kontrolera `tasks.py`. Refaktor zachowuje dotychczasowy format planów i dzienników; istniejące zadania nie wymagają migracji. Przed zmianą operacji plikowych uruchom cały zestaw testów bezpieczeństwa i odzyskiwania. Testy Tk mogą być pominięte na Linux bez ekranu; CI Windows sprawdza również GUI i rozpakowane EXE.
