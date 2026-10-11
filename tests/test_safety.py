@@ -11,7 +11,7 @@ from photosort.core import Organizer, folder_for, rename_exclusive
 class SafetyTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
-        self.base = Path(self.temp.name)
+        self.base = Path(self.temp.name).resolve()
         self.src, self.dst, self.job = [self.base/p for p in ('source', 'target', 'job')]
         self.src.mkdir()
         self.dst.mkdir()
