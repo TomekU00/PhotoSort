@@ -8,7 +8,7 @@ import shutil
 import stat
 import time
 from pathlib import Path
-from .extensions import normalize_extensions, matches
+from .extensions import GROUPS, normalize_extensions, matches
 from .metadata import PHOTOS, VIDEOS, SIDECARS, capture
 
 SKIP = {'@eadir', '#recycle', '$recycle.bin', 'system volume information'}
@@ -86,7 +86,7 @@ class Organizer:
             raise RuntimeError('Zadanie zablokowane: proces działa albo pozostał lock po awarii. Sprawdź proces przed usunięciem lock.')
         return p
 
-    def plan(self, source, target, pattern='%Y/%m', scope='all', timezone='Europe/Warsaw', extensions=None):
+    def plan(self, source, target, pattern='%Y/%m', scope='multimedia', timezone='Europe/Warsaw', extensions=None):
         from datetime import datetime
         source, target = Path(source).expanduser().resolve(), Path(target).expanduser().resolve()
         if not source.is_dir():
@@ -100,7 +100,7 @@ class Organizer:
         else:
             raise ValueError('Źródło i cel nie mogą być identyczne; cel nie może zawierać źródła')
         folder_for(datetime.now(), pattern)
-        if scope not in ('photos', 'media', 'all'):
+        if scope not in ('photos', 'media', 'multimedia', 'all', 'audio'):
             raise ValueError('Nieprawidłowy zakres')
         extensions = normalize_extensions(extensions)
         config = dict(source=str(source), target=str(target), pattern=pattern, scope=scope, timezone=timezone)
@@ -146,7 +146,9 @@ class Organizer:
                     raise InterruptedError('Przerwano planowanie')
                 p = Path(r['path'])
                 ext = p.suffix.lower().lstrip('.')
-                included = scope == 'all' or ext in PHOTOS or (scope == 'media' and ext in VIDEOS)
+                included = (scope in ('all', 'multimedia') or (scope == 'photos' and ext in PHOTOS) or
+                            (scope == 'media' and ext in PHOTOS | VIDEOS) or
+                            (scope == 'audio' and ext in GROUPS['Dźwięk']))
                 if included and matches(p, extensions):
                     date, method, errs = capture(p, r['mtime'], timezone, lookup)
                     dates[r['path']] = (date, method)

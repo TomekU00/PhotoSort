@@ -21,7 +21,7 @@ def main():
     ttk.Label(box, text='PhotoSort', font=('Segoe UI', 23, 'bold')).pack(anchor='w')
     ttk.Label(box, text='Najpierw plan. Potem przenoszenie z kontrolą kopii i możliwością wznowienia.').pack(anchor='w', pady=(4, 16))
     variables = {key: tk.StringVar(value=value) for key, value in
-                 [('source', ''), ('target', ''), ('pattern', '%Y/%m'), ('scope', 'all'), ('address', ''), ('user', ''), ('mode', 'Lokalnie → lokalnie')]}
+                 [('source', ''), ('target', ''), ('pattern', '%Y/%m'), ('scope', 'multimedia'), ('address', ''), ('user', ''), ('mode', 'Lokalnie → lokalnie')]}
     def row(label, key, browse=False, choices=None):
         f = ttk.Frame(box)
         f.pack(fill='x', pady=5)
@@ -40,9 +40,9 @@ def main():
     row('Źródło', 'source', True)
     row('Cel', 'target', True)
     row('Format folderów', 'pattern', choices=['%Y/%m', '%Y/%m/%d', '%Y-%m', '%Y'])
-    row('Zakres', 'scope', choices=['all', 'media', 'photos'])
+    row('Zakres', 'scope', choices=['multimedia', 'media', 'photos', 'audio'])
     extension_state = {'values': None}
-    extension_label = tk.StringVar(value='Wszystkie rozszerzenia (według zakresu)')
+    extension_label = tk.StringVar(value='Wszystkie multimedia (według zakresu)')
     def choose_extensions():
         dialog = tk.Toplevel(root)
         dialog.title('Wybierz rozszerzenia')
@@ -75,7 +75,7 @@ def main():
                 value = tk.BooleanVar(value=selected is None or ext in selected)
                 toggles[ext] = value
                 local.append(value)
-                text = {'@none': 'Bez rozszerzenia', '@other': 'Nierozpoznane rozszerzenia'}.get(ext, ext.upper())
+                text = ext.upper()
                 ttk.Checkbutton(panel, text=text, variable=value).grid(row=n//5+1, column=n%5, sticky='w', padx=8, pady=4)
             controls = ttk.Frame(panel)
             controls.grid(row=0, column=0, columnspan=5, sticky='w', pady=(0,10))
@@ -84,34 +84,30 @@ def main():
                     item.set(flag)
             ttk.Button(controls, text='Zaznacz grupę', command=lambda items=local: set_group(items, True)).pack(side='left')
             ttk.Button(controls, text='Odznacz grupę', command=lambda items=local: set_group(items, False)).pack(side='left', padx=8)
-        custom = tk.StringVar(value=','.join(ext for ext in selected or [] if ext not in toggles))
-        ttk.Label(dialog, text='Własne rozszerzenia, oddzielone przecinkiem:').pack(anchor='w', padx=12, pady=(10,0))
-        ttk.Entry(dialog, textvariable=custom).pack(fill='x', padx=12)
         ttk.Label(dialog, text='JSON/XMP i pozostałe rozpoznane pliki towarzyszące wybranym zdjęciom jadą razem z nimi.', wraplength=720).pack(anchor='w', padx=12, pady=8)
         footer = ttk.Frame(dialog, padding=12)
         footer.pack(fill='x')
         def confirm():
             try:
                 values = [ext for ext, value in toggles.items() if value.get()]
-                values += normalize_extensions(custom.get()) if custom.get().strip() else []
                 extension_state['values'] = normalize_extensions(values)
-                variables['scope'].set('all')
+                variables['scope'].set('multimedia')
                 extension_label.set('Wybrane rozszerzenia: '+str(len(extension_state['values'])))
                 dialog.destroy()
             except ValueError as e:
                 messagebox.showerror('Rozszerzenia', str(e), parent=dialog)
         def all_files():
             extension_state['values'] = None
-            extension_label.set('Wszystkie rozszerzenia (według zakresu)')
+            extension_label.set('Wszystkie multimedia (według zakresu)')
             dialog.destroy()
         ttk.Button(footer, text='Odznacz wszystko', command=lambda: [v.set(False) for v in toggles.values()]).pack(side='left')
-        ttk.Button(footer, text='Wszystkie pliki', command=all_files).pack(side='left', padx=8)
+        ttk.Button(footer, text='Wszystkie multimedia', command=all_files).pack(side='left', padx=8)
         ttk.Button(footer, text='Zapisz wybór', command=confirm).pack(side='right')
     extension_row = ttk.Frame(box)
     extension_row.pack(fill='x', pady=5)
     ttk.Button(extension_row, text='Wybierz rozszerzenia…', command=choose_extensions).pack(side='left')
     ttk.Label(extension_row, textvariable=extension_label).pack(side='left', padx=12)
-    ttk.Label(box, text='all: wszystkie pliki · media: zdjęcia i filmy · photos: zdjęcia\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
+    ttk.Label(box, text='multimedia: zdjęcia, filmy i dźwięk · media: zdjęcia i filmy · photos: zdjęcia · audio: dźwięk\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
     ttk.Label(box, text='Lokalnie → lokalnie: wybierz dwa foldery na komputerze.\nSSH: wpisz adres NAS i nazwę użytkownika DSM. Hasło wpisujesz w osobnym terminalu;\nznaki hasła nie są widoczne. Przy pierwszym połączeniu sprawdź klucz serwera.').pack(anchor='w', pady=4)
     actions_ssh = ttk.Frame(box)
     actions_ssh.pack(fill='x')
@@ -195,9 +191,9 @@ def main():
             if p.exists():
                 config = json.loads(p.read_text(encoding='utf-8'))['config']
                 extension_state['values'] = config.get('extensions')
-                extension_label.set('Wybrane rozszerzenia: '+str(len(config['extensions'])) if config.get('extensions') is not None else 'Wszystkie rozszerzenia (według zakresu)')
+                extension_label.set('Wybrane rozszerzenia: '+str(len(config['extensions'])) if config.get('extensions') is not None else 'Wszystkie multimedia (według zakresu)')
                 for key in ('source', 'target', 'pattern', 'scope'):
-                    variables[key].set(config[key])
+                    variables[key].set('multimedia' if key == 'scope' and config[key] == 'all' else config[key])
     ttk.Button(actions, text='Otwórz zadanie', command=load).pack(side='right')
     def poll():
         while not events.empty():
