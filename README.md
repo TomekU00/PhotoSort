@@ -1,6 +1,6 @@
 # PhotoSort
 
-Prosty program do porządkowania zdjęć, RAW, filmów i pozostałych plików według dat.
+Prosty program do porządkowania zdjęć, RAW, filmów i dźwięku według dat.
 Okno działa na Windows i Linux. Te same operacje można uruchamiać z terminala oraz
 przez SSH bezpośrednio na NAS. Python 3.8 lub nowszy; GUI wymaga Tkinter.
 
@@ -24,12 +24,12 @@ Plany i dzienniki domyślnie są w `~/.photosort/jobs/`.
 
 Formaty: `%Y/%m` → `2024/08`, `%Y/%m/%d` → `2024/08/26`, `%Y-%m` → `2024-08`,
 `%Y` → `2024`. Możesz wpisać własny format z `%Y`, `%m`, `%d`.
-Zakres: `photos`, `media` (zdjęcia i filmy), `all` (wszystkie pliki).
+Zakres: `photos` (zdjęcia/RAW), `media` (zdjęcia i filmy), `audio` (dźwięk), `multimedia` (wszystkie obsługiwane multimedia).
 
 ## Terminal — lokalnie lub na zmapowanych dyskach
 
 ```sh
-photosort plan /folder/zrodlo /folder/cel --job ./zadanie --format '%Y/%m' --scope all
+photosort plan /folder/zrodlo /folder/cel --job ./zadanie --format '%Y/%m' --scope multimedia
 photosort apply --job ./zadanie
 photosort status --job ./zadanie
 ```
@@ -127,13 +127,13 @@ Test logowania nie uruchamia przenoszenia. Tworzenie planu i wznowienie otwieraj
 
 ## Wybór rozszerzeń
 
-Przycisk **Wybierz rozszerzenia…** otwiera grupy: zdjęcia i grafika, RAW, filmy, pliki towarzyszące, dźwięk, dokumenty, archiwa, katalogi fotograficzne oraz pozostałe formaty z wcześniejszego sortowania. Każdą grupę i każde rozszerzenie można zaznaczyć osobno. Można dopisać własne rozszerzenia, wybrać pliki bez rozszerzenia lub nierozpoznane formaty. **Wszystkie pliki** wyłącza filtr rozszerzeń.
+Przycisk **Wybierz rozszerzenia…** otwiera tylko cztery grupy: zdjęcia i grafika, RAW, filmy oraz dźwięk. Można zaznaczyć grupy lub pojedyncze formaty. **Wszystkie multimedia** wyłącza szczegółowy filtr, ale nadal pomija dokumenty, archiwa, programy, samodzielne JSON/XMP oraz nierozpoznane formaty. Pliki te pozostają w źródle.
 
-Zapisanie wyboru w oknie ustawia zakres `all`, aby wybrane formaty nie były odrzucone przez poprzedni zakres. Późniejszy wybór zakresu zawęża filtr. Terminal i SSH używają tego samego filtra:
+Zapisanie wyboru ustawia zakres `multimedia`; późniejszy wybór zakresu zawęża filtr. Terminal i SSH korzystają z tej samej listy:
 
 ```sh
-photosort plan /zrodlo /cel --job ./zadanie --extensions jpg,cr3,mp4
-photosort remote Tomek@NAS /volume1/photo /volume1/homes --job import2 --extensions jpg,cr3,mp4
+photosort plan /zrodlo /cel --job ./zadanie --extensions jpg,cr3,mp4,mp3
+photosort remote Tomek@NAS /volume1/photo /volume1/homes --job import2 --extensions jpg,cr3,mp4,mp3
 ```
 
-`@none` oznacza pliki bez rozszerzenia, `@other` rozszerzenia spoza znanych list. Filtr nie zmienia organizacji docelowej: nadal używany jest wybrany format dat. JSON/XMP i inne rozpoznane pliki towarzyszące wybranym zdjęciom lub filmom są dołączane automatycznie, nawet jeśli nie zaznaczono ich rozszerzenia. Wybór zapisuje się w niezmiennym planie; zmiana filtra wymaga nowego zadania.
+JSON/XMP i inne rozpoznane metadane wybranych zdjęć lub filmów są automatycznie dołączane. Nie są osobną kategorią do sortowania. Filtr zapisuje się w planie; zmiana wyboru wymaga nowego zadania. Dawne plany pozostają niezmienione — po aktualizacji utwórz nowy plan, aby zastosować ograniczenie do multimediów.
