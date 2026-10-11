@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 from photosort.core import Organizer, rename_exclusive
 
@@ -35,6 +36,14 @@ class RecoveryTests(unittest.TestCase):
         if source == self.photo:
             raise OSError(errno.EXDEV, 'forced cross-device move')
         return rename_exclusive(source, target)
+
+    def hardlink(self, source, target):
+        try:
+            os.link(source, target)
+        except OSError as e:
+            if e.errno in (errno.EPERM, errno.EACCES, errno.ENOTSUP):
+                self.skipTest('Hard links unavailable in this filesystem/sandbox')
+            raise
 
     def assert_finished(self):
         Organizer(self.job).apply()
@@ -104,6 +113,77 @@ class RecoveryTests(unittest.TestCase):
                 Organizer(self.job).apply()
         self.assertFalse(self.photo.exists())
         self.assert_finished()
+
+    def test_recover_after_fallback_link_before_source_unlink(self):
+        real_unlink = Path.unlink
+        def unlink(path, *args, **kwargs):
+            if path == self.photo:
+                raise PowerLoss('linked before source unlink')
+            return real_unlink(path, *args, **kwargs)
+        def fallback(source, target):
+            # Exercise the real fallback even on Windows or modern Linux.
+            with patch('photosort.filesystem.os', SimpleNamespace(name='posix', link=self.hardlink)), \
+                 patch('photosort.filesystem.ctypes.CDLL', return_value=object()), \
+                 patch('photosort.filesystem.syncdir'), patch.object(Path, 'unlink', unlink):
+                rename_exclusive(source, target)
+        with patch('photosort.core.rename_exclusive', fallback):
+            with self.assertRaises(PowerLoss):
+                Organizer(self.job).apply()
+        self.assertTrue(os.path.samefile(self.photo, self.destination))
+        events = [json.loads(line) for line in (self.job/'journal.jsonl').read_bytes().splitlines()]
+        self.assertEqual(events[-1]['status'], 'intent')
+        order = []
+        def synced(path):
+            order.append(('sync', path))
+        def removed(path, *args, **kwargs):
+            order.append(('unlink', path))
+            return real_unlink(path, *args, **kwargs)
+        with patch('photosort.core.syncdir', synced), patch.object(Path, 'unlink', removed):
+            self.assert_finished()
+        self.assertLess(order.index(('sync', self.destination.parent)),
+                        order.index(('unlink', self.photo)))
+
+    def test_intent_does_not_accept_unrelated_destination(self):
+        from photosort.journal import Journal
+        s = self.photo.stat()
+        journal = Journal(self.job/'journal.jsonl', self.identity)
+        with journal.writer():
+            journal.record(self.plan['files'][0], 'intent', device=s.st_dev, inode=s.st_ino)
+        self.destination.parent.mkdir(parents=True)
+        self.destination.write_bytes(self.photo.read_bytes())
+        os.utime(self.destination, (s.st_atime, s.st_mtime))
+        with self.assertRaises(FileExistsError):
+            Organizer(self.job).apply()
+        self.assertTrue(self.photo.exists() and self.destination.exists())
+
+    def test_linked_pair_must_match_original_journal_identity(self):
+        from photosort.journal import Journal
+        s = self.photo.stat()
+        journal = Journal(self.job/'journal.jsonl', self.identity)
+        with journal.writer():
+            journal.record(self.plan['files'][0], 'intent', device=s.st_dev, inode=s.st_ino)
+        self.photo.rename(self.source/'original.backup')
+        self.photo.write_bytes(b'original media' * 100)
+        os.utime(self.photo, (s.st_atime, s.st_mtime))
+        self.destination.parent.mkdir(parents=True)
+        self.hardlink(self.photo, self.destination)
+        with self.assertRaises(FileExistsError):
+            Organizer(self.job).apply()
+        self.assertTrue(self.photo.exists() and self.destination.exists())
+
+    def test_intent_resume_with_simulated_hardlink_identity(self):
+        from photosort.journal import Journal
+        s = self.photo.stat()
+        journal = Journal(self.job/'journal.jsonl', self.identity)
+        with journal.writer():
+            journal.record(self.plan['files'][0], 'intent', device=s.st_dev, inode=s.st_ino)
+        self.destination.parent.mkdir(parents=True)
+        self.destination.write_bytes(self.photo.read_bytes())
+        real_lstat = Path.lstat
+        def lstat(path):
+            return s if path == self.destination else real_lstat(path)
+        with patch.object(Path, 'lstat', lstat):
+            self.assert_finished()
 
     def test_changed_published_copy_retains_source(self):
         self.crash_after_record('copied')
