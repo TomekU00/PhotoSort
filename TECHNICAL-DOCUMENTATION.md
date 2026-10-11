@@ -38,7 +38,7 @@ Daty w nazwie pliku nie są analizowane. Zewnętrzny XMP jest przenoszony jako p
 
 JSON, XMP, DOP, ACR, AAE, PP3, COS, COF i NKSC mogą zachowywać informacje eksportu lub edycji. Program przypina rozpoznane pliki do zdjęcia lub filmu: np. IMG.JPG.json, plik o wspólnej bazie nazwy albo JSON z podfolderu json. Plik towarzyszący dziedziczy folder daty właściciela. Wspólny sidecar RAW/JPEG ma jednego deterministycznego właściciela.
 
-Istniejące nazwy są rezerwowane bez rozróżniania wielkości liter. Przy kolizji grupa otrzymuje wspólny sufiks oparty na skrócie identyfikatora grupy, w razie potrzeby z dalszym numerem. Program nie nadpisuje istniejącego celu. To rozwiązywanie nazw, nie deduplikacja zawartości. Identyczne zdjęcia mogą pozostać jako osobne pliki.
+Istniejące nazwy są rezerwowane bez rozróżniania wielkości liter. Przy kolizji grupa otrzymuje wspólny sufiks oparty na skrócie identyfikatora grupy, w razie potrzeby z dalszym numerem. Program nie nadpisuje istniejącego celu. Podczas apply moduł duplicates.py porównuje rozmiar i SHA-256 źródła oraz pliku pod pierwotną nazwą w folderze daty albo zaplanowaną nazwą z sufiksem. Gdy wszystkie multimedia grupy są identyczne z istniejącymi kopiami, grupa z sidecarami trafia do źródło/Duplikaty z zachowaniem względnych ścieżek. Folder powstaje przy pierwszym przeniesieniu i jest pomijany przy skanowaniu. Dla częściowo powielonej grupy RAW/JPEG zachowane są dotychczasowe reguły kolizji. Zajęta ścieżka w Duplikaty zatrzymuje pracę. Trwały duplicates.json wiąże decyzje z identyfikatorem niezmienionego planu. FileMover i istniejący dziennik obsługują przenoszenie oraz wznowienie do wybranej lokalizacji. Po rozpoczęciu wykonania grupy jej lokalizacje nie są zmieniane. Sprawdzenie odbywa się przy preflight oraz przed rozpoczęciem grupy; kolizja powstała w samej operacji rename nadal zatrzymuje zadanie bez nadpisania. Mechanizm obejmuje również wcześniejsze plany, ale nie zmienia operacji już rozpoczętych w dzienniku. Nie szuka kopii pod dowolnymi nazwami w całej kolekcji.
 
 ## 6. Przenoszenie i kontrola zawartości
 
@@ -110,7 +110,7 @@ photosort remote uzytkownik@NAS /volume1/photo /volume1/homes --job import1 --st
 
 Dla 0.1.6 wykonano 18 testów bezpieczeństwa oraz test uruchomienia obu EXE bez PYTHONPATH/PYTHONHOME i plan/przenoszenie terminalowego EXE. Wcześniejsza konfiguracja CI obejmuje Windows/Linux i Python 3.8/3.12; nie stanowi to deklaracji wyniku każdego późniejszego uruchomienia CI. Nie jest to audyt wszystkich formatów ani test wszystkich konfiguracji SMB/NAS.
 
-Nie ma deduplikacji, galerii GPS, automatycznego pobierania Google Photos, automatycznego backupu, globalnego cofania ani importu zadań wcześniejszych skryptów NAS. Rozpoznane rozszerzenie nie gwarantuje odczytu dat każdej odmiany pliku. Nie zmieniaj plików równolegle podczas operacji.
+Nie ma globalnej deduplikacji ani wyszukiwania podobnych obrazów, galerii GPS, automatycznego pobierania Google Photos, automatycznego backupu, globalnego cofania ani importu zadań wcześniejszych skryptów NAS. Rozpoznane rozszerzenie nie gwarantuje odczytu dat każdej odmiany pliku. Nie zmieniaj plików równolegle podczas operacji.
 
 Źródłem opisu jest kod repozytorium PhotoSort: core.py, metadata.py, extensions.py, remote.py, gui.py, cli.py, test_safety.py oraz skrypty budowania. Punkt odniesienia wydania: https://github.com/TomekU00/PhotoSort/releases/tag/v0.1.6 . Pełna historia funkcji 0.1.0–0.1.7 znajduje się w CHANGELOG.md i opisie wydania. Wersje 0.1.2–0.1.5 były wersjami rozwojowymi bez osobnych wydań GitHub.
 

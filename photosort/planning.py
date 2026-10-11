@@ -92,7 +92,7 @@ def scan_source(source, target, job, exclusions, skip_app_resources, status, sto
                         inside_target = True
                     except ValueError:
                         inside_target = False
-                    if inside_target or resolved == job:
+                    if inside_target or resolved == job or (directory == source and e.name.casefold() == 'duplikaty'):
                         skipped.append(e.path)
                     else:
                         stack.append(Path(e.path))
