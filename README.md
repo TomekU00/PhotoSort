@@ -164,3 +164,21 @@ Zakres to niezależne pola **Zdjęcia i RAW**, **Filmy**, **Dźwięk**. Możesz 
 Po pomyślnej weryfikacji przenosin program sprząta puste katalogi źródłowe, również źródło, jeżeli jest puste. Pliki niewybrane i dokumenty pozostają, więc zawierające je foldery nie zostaną usunięte. Katalog docelowy wewnątrz źródła jest chroniony.
 
 Budowa EXE: `python -m pip install . pyinstaller pillow`, a następnie `powershell -File build-windows.ps1`. Ikona PS jest lokalnym rysunkiem; źródła i skrypt jej generowania są w `PhotoSort.svg` i `make-icon.py` (ICO/PNG powstają w `assets/`).
+
+## Automatyczna paczka Windows
+
+Workflow **Windows package** buduje Windows x64 na Pythonie 3.12 przy push do `main`, pull request, ręcznym uruchomieniu oraz opublikowaniu wydania. Najpierw uruchamia testy bezpieczeństwa, potem buduje oba EXE, tworzy `PhotoSort-<wersja>-windows-x64.zip` i plik `.zip.sha256`. Rozpakowana paczka przechodzi test GUI, terminala, planowania, kolizji i wznowienia bez PYTHONPATH/PYTHONHOME. Artefakt jest dostępny w zakładce Actions przez 30 dni.
+
+Aby dodać paczkę do Releases, opublikuj wydanie z tagiem odpowiadającym `pyproject.toml`, np. `v0.1.7`. Workflow dołącza ZIP i sumę SHA-256 dopiero po testach. Nie nadpisuje istniejących assetów; ponowna publikacja wymaga świadomego usunięcia poprzednich plików w wydaniu. Nie wymaga osobnego tokenu: tylko job publikacji otrzymuje `contents: write`.
+
+Budowanie lokalne w PowerShell:
+
+```powershell
+python -m pip install . -r requirements-build.txt
+python -m unittest discover -s tests -v
+./build-windows.ps1
+./package-windows.ps1
+python scripts/smoke-windows.py dist/PhotoSort-0.1.7-windows-x64.zip
+```
+
+Używaj świeżego katalogu wyjściowego. Rozpakuj cały ZIP, zachowując strukturę `PhotoSort/`. Paczka nie zawiera zadań użytkownika; aktualizacja nie zmienia planów i dzienników w `~/.photosort/jobs/`. Wznawiaj przez `apply --job` dla tego samego zadania. Test paczki korzysta wyłącznie z tymczasowych danych syntetycznych.

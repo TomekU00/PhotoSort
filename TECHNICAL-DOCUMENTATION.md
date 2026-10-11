@@ -1,4 +1,4 @@
-# PhotoSort 0.1.6 - dokumentacja techniczna i edukacyjna
+# PhotoSort 0.1.7 - dokumentacja techniczna i edukacyjna
 
 Stan: 11 października 2026. Dokument opisuje obecną implementację, nie planowane funkcje. Czytelnik pozna drogę pliku od skanowania do zweryfikowanego celu oraz sposób odzyskiwania pracy po przerwaniu.
 
@@ -110,4 +110,10 @@ Dla 0.1.6 wykonano 18 testów bezpieczeństwa oraz test uruchomienia obu EXE bez
 
 Nie ma deduplikacji, galerii GPS, automatycznego pobierania Google Photos, automatycznego backupu, globalnego cofania ani importu zadań wcześniejszych skryptów NAS. Rozpoznane rozszerzenie nie gwarantuje odczytu dat każdej odmiany pliku. Nie zmieniaj plików równolegle podczas operacji.
 
-Źródłem opisu jest kod repozytorium PhotoSort: core.py, metadata.py, extensions.py, remote.py, gui.py, cli.py, test_safety.py oraz skrypty budowania. Punkt odniesienia wydania: https://github.com/TomekU00/PhotoSort/releases/tag/v0.1.6 . Pełna historia funkcji 0.1.0–0.1.6 znajduje się w CHANGELOG.md i opisie wydania. Wersje 0.1.2–0.1.5 były wersjami rozwojowymi bez osobnych wydań GitHub.
+Źródłem opisu jest kod repozytorium PhotoSort: core.py, metadata.py, extensions.py, remote.py, gui.py, cli.py, test_safety.py oraz skrypty budowania. Punkt odniesienia wydania: https://github.com/TomekU00/PhotoSort/releases/tag/v0.1.6 . Pełna historia funkcji 0.1.0–0.1.7 znajduje się w CHANGELOG.md i opisie wydania. Wersje 0.1.2–0.1.5 były wersjami rozwojowymi bez osobnych wydań GitHub.
+
+## 12. Automatyczne budowanie i publikacja
+
+`.github/workflows/windows.yml` uruchamia pełny zestaw testów bezpieczeństwa przed budową PyInstaller. `requirements-build.txt` przypina wersje narzędzi budowania; zależności aplikacji nadal wynikają z `pyproject.toml`. `package-windows.ps1` pakuje oba EXE, `_internal` i dokumentację oraz oblicza SHA-256 archiwum. `scripts/smoke-windows.py` sprawdza sumę, rozpakowuje paczkę w katalogu tymczasowym i uruchamia ją poza repozytorium bez PYTHONPATH/PYTHONHOME. Sprawdza pozostawienie źródła przy kolizji, przeniesienie multimediów i sidecara, zachowanie dokumentu oraz niezmienność planu i dziennika po ponownym apply. Sprawdza także start GUI.
+
+Publikacja artefaktu Actions następuje po wszystkich testach. Opublikowanie wydania z tagiem `v<wersja z pyproject.toml>` dodatkowo uruchamia osobny job załączający ZIP i checksum do tego wydania. Job budowy ma tylko odczyt repozytorium, a job publikacji `contents: write`. Nie są pakowane zadania użytkownika ani dane testowe. Workflow nie zmienia algorytmów przenoszenia, formatu planu, dziennika i blokady. Testy CI nie zastępują testu na rzeczywistym SMB/NAS.
