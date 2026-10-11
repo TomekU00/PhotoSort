@@ -7,6 +7,20 @@ import subprocess
 import zipfile
 from pathlib import Path
 
+def make_host(address, user):
+    address, user = address.strip(), user.strip()
+    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.:-]*', address):
+        raise ValueError('Podaj adres IP lub nazwę NAS, bez http:// i bez portu DSM.')
+    if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]*', user):
+        raise ValueError('Podaj nazwę użytkownika SSH / DSM.')
+    return user+'@'+address
+
+def connect(host):
+    if not re.fullmatch(r'[A-Za-z0-9_.@:-]+', host) or host.startswith('-'):
+        raise ValueError('Nieprawidłowy host SSH')
+    print('Wpisz hasło użytkownika DSM i naciśnij Enter. Znaki hasła nie będą widoczne.', flush=True)
+    return subprocess.run(['ssh', host, 'python3 --version'], check=True).returncode
+
 def bundle():
     import exifread
     import pytz

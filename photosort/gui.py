@@ -13,14 +13,14 @@ from .core import Organizer
 def main():
     root = tk.Tk()
     root.title('PhotoSort — porządkowanie kolekcji')
-    root.geometry('820x660')
+    root.geometry('860x780')
     root.minsize(700, 580)
     box = ttk.Frame(root, padding=22)
     box.pack(fill='both', expand=True)
     ttk.Label(box, text='PhotoSort', font=('Segoe UI', 23, 'bold')).pack(anchor='w')
     ttk.Label(box, text='Najpierw plan. Potem przenoszenie z kontrolą kopii i możliwością wznowienia.').pack(anchor='w', pady=(4, 16))
     variables = {key: tk.StringVar(value=value) for key, value in
-                 [('source', ''), ('target', ''), ('pattern', '%Y/%m'), ('scope', 'all'), ('host', ''), ('mode', 'Lokalnie / dysk sieciowy')]}
+                 [('source', ''), ('target', ''), ('pattern', '%Y/%m'), ('scope', 'all'), ('address', ''), ('user', ''), ('mode', 'Lokalnie → lokalnie')]}
     def row(label, key, browse=False, choices=None):
         f = ttk.Frame(box)
         f.pack(fill='x', pady=5)
@@ -33,13 +33,17 @@ def main():
                 if path:
                     variables[key].set(path)
             ttk.Button(f, text='Wybierz…', command=select).pack(side='left', padx=(8, 0))
-    row('Tryb', 'mode', choices=['Lokalnie / dysk sieciowy', 'SSH na NAS / Linux'])
-    row('Host SSH', 'host')
+    row('Tryb', 'mode', choices=['Lokalnie → lokalnie', 'Komputer / dysk sieciowy', 'SSH na NAS / Linux'])
+    row('Adres NAS / SSH', 'address')
+    row('Użytkownik SSH', 'user')
     row('Źródło', 'source', True)
     row('Cel', 'target', True)
     row('Format folderów', 'pattern', choices=['%Y/%m', '%Y/%m/%d', '%Y-%m', '%Y'])
     row('Zakres', 'scope', choices=['all', 'media', 'photos'])
     ttk.Label(box, text='all: wszystkie pliki · media: zdjęcia i filmy · photos: zdjęcia\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
+    ttk.Label(box, text='Lokalnie → lokalnie: wybierz dwa foldery na komputerze.\nSSH: wpisz adres NAS i nazwę użytkownika DSM. Hasło wpisujesz w osobnym terminalu;\nznaki hasła nie są widoczne. Przy pierwszym połączeniu sprawdź klucz serwera.').pack(anchor='w', pady=4)
+    actions_ssh = ttk.Frame(box)
+    actions_ssh.pack(fill='x')
     jobvar = tk.StringVar(value=str(Path.home()/'.photosort/jobs'/uuid.uuid4().hex[:12]))
     f = ttk.Frame(box)
     f.pack(fill='x', pady=4)
@@ -54,23 +58,39 @@ def main():
     bar.pack(fill='x')
     output = tk.Text(box, height=7, wrap='word', font=('Consolas', 10))
     output.pack(fill='both', expand=True, pady=10)
-    def remote(action):
-        job = Path(jobvar.get()).name
-        launcher = Path(__file__).parent.parent/'launch.py'
-        prefix = [sys.executable, str(launcher)] if launcher.exists() else [sys.executable, '-m', 'photosort']
-        args = prefix + ['remote', variables['host'].get(), variables['source'].get(), variables['target'].get(),
-                '--job', job, '--format', variables['pattern'].get(), '--scope', variables['scope'].get()]
-        if action == 'apply':
-            args += ['--resume']
+    def ssh_host():
+        from .remote import make_host
+        return make_host(variables['address'].get(), variables['user'].get())
+    def terminal(args):
         if os.name == 'nt':
             subprocess.Popen(args, creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:
             messagebox.showinfo('SSH w terminalu', 'Uruchom w terminalu:\n\n'+__import__('shlex').join(args))
+    def prefix():
+        launcher = Path(__file__).parent.parent/'launch.py'
+        return [sys.executable, str(launcher)] if launcher.exists() else [sys.executable, '-m', 'photosort']
+    def connect():
+        try:
+            terminal(prefix()+['connect', ssh_host(), '--wait'])
+        except Exception as e:
+            messagebox.showerror('SSH', str(e))
+    ttk.Button(actions_ssh, text='Sprawdź logowanie SSH', command=connect).pack(anchor='w')
+    def remote(action):
+        job = Path(jobvar.get()).name
+        args = prefix() + ['remote', ssh_host(), variables['source'].get(), variables['target'].get(),
+                '--wait', '--job', job, '--format', variables['pattern'].get(), '--scope', variables['scope'].get()]
+        if action == 'apply':
+            args += ['--resume']
+        terminal(args)
     def start(action):
         if state['thread'] and state['thread'].is_alive():
             return
         if variables['mode'].get().startswith('SSH'):
-            return remote(action)
+            try:
+                return remote(action)
+            except Exception as e:
+                messagebox.showerror('SSH', str(e))
+                return
         stopped.clear()
         job = jobvar.get()
         settings = {key: value.get() for key, value in variables.items()}
