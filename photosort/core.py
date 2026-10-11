@@ -91,12 +91,14 @@ class Organizer:
         source, target = Path(source).expanduser().resolve(), Path(target).expanduser().resolve()
         if not source.is_dir():
             raise ValueError('Źródło nie jest katalogiem')
-        for a, b in ((source, target), (target, source)):
-            try:
-                a.relative_to(b)
-            except ValueError:
-                continue
-            raise ValueError('Źródło i cel muszą być osobnymi, niezagnieżdżonymi katalogami')
+        # A destination inside source is supported and excluded from traversal.
+        # Reject identical roots and a destination containing the source.
+        try:
+            source.relative_to(target)
+        except ValueError:
+            pass
+        else:
+            raise ValueError('Źródło i cel nie mogą być identyczne; cel nie może zawierać źródła')
         folder_for(datetime.now(), pattern)
         if scope not in ('photos', 'media', 'all'):
             raise ValueError('Nieprawidłowy zakres')
@@ -122,7 +124,13 @@ class Organizer:
                         if e.name.casefold() in SKIP or e.is_symlink():
                             skipped.append(e.path)
                         elif e.is_dir(follow_symlinks=False):
-                            if Path(e.path).resolve() == self.job:
+                            resolved = Path(e.path).resolve()
+                            try:
+                                resolved.relative_to(target)
+                                inside_target = True
+                            except ValueError:
+                                inside_target = False
+                            if inside_target or resolved == self.job:
                                 skipped.append(e.path)
                             else:
                                 stack.append(Path(e.path))
