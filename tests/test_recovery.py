@@ -132,6 +132,33 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(journal.read_bytes(), data)
         self.assertFalse((self.job/'partial-journal.txt').exists())
 
+    def test_complete_last_event_without_newline_survives_resume(self):
+        self.crash_after_record('copied')
+        journal = self.job / 'journal.jsonl'
+        original = journal.read_bytes()
+        journal.write_bytes(original.rstrip(b'\n'))
+        self.assert_finished()
+        events = [json.loads(line) for line in journal.read_bytes().splitlines()]
+        self.assertEqual([e['status'] for e in events],
+                         ['intent', 'copying', 'copy_ready', 'copied', 'moved'])
+        self.assertTrue(journal.read_bytes().startswith(original))
+        self.assertFalse((self.job/'partial-journal.txt').exists())
+
+    def test_newline_repair_is_durable_and_idempotent(self):
+        from photosort.journal import Journal
+        event = dict(self.plan['files'][0], status='intent', plan_id=self.identity)
+        journal = self.job / 'journal.jsonl'
+        data = json.dumps(event).encode()
+        journal.write_bytes(data)
+        replay = Journal(journal, self.identity)
+        with patch('photosort.journal.os.fsync', wraps=os.fsync) as sync:
+            replay.replay()
+            self.assertEqual(sync.call_count, 1)
+            replay.replay()
+            self.assertEqual(sync.call_count, 1)
+        self.assertEqual(journal.read_bytes(), data+b'\n')
+        self.assertEqual(replay.prior[str(self.photo)], event)
+
     def test_journal_from_another_plan_is_rejected(self):
         event = dict(self.plan['files'][0], status='intent', plan_id='wrong-plan')
         (self.job/'journal.jsonl').write_text(json.dumps(event)+'\n')

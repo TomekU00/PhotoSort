@@ -17,9 +17,11 @@ class Journal:
         self.log = None
 
     def replay(self):
+        self.prior = {}
         if self.path.exists():
             with self.path.open('rb') as f:
                 cut = None
+                missing_newline = False
                 while True:
                     offset = f.tell()
                     line = f.readline()
@@ -36,9 +38,18 @@ class Journal:
                     if event['plan_id'] != self.identity:
                         raise ValueError('Dziennik należy do innego planu')
                     self.prior[event['source']] = event
-            if cut is not None:
+                    missing_newline = not line.endswith(b'\n')
+            if cut is not None or missing_newline:
                 with self.path.open('r+b') as f:
-                    f.truncate(cut)
+                    if cut is not None:
+                        f.truncate(cut)
+                    else:
+                        # A complete JSON event can survive without its separator.
+                        # Repair it durably before writer() appends another event.
+                        f.seek(0, os.SEEK_END)
+                        f.write(b'\n')
+                    f.flush()
+                    os.fsync(f.fileno())
 
     @contextmanager
     def writer(self):
