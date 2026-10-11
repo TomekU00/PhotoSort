@@ -5,6 +5,7 @@ from pathlib import Path
 # Keep these imports available for existing callers and fault-injection tests.
 from .filesystem import save, syncdir, rename_exclusive, shutil, FileMover, cleanup_empty_directories
 from .journal import Journal, plan_identity
+from .duplicates import DuplicateRoutes
 from .planning import (folder_for, prepare_configuration, scan_source, select_media,
                        attach_companions, assign_destinations)
 
@@ -82,11 +83,19 @@ class Organizer:
             journal.replay()
             mover = FileMover(source_root, target_root, journal, self.stop,
                               rename=rename_exclusive, sync=syncdir)
+            duplicates = DuplicateRoutes(plan, self.job, journal, mover)
+            quarantine = FileMover(source_root, duplicates.root, journal, self.stop,
+                                   rename=rename_exclusive, sync=syncdir)
+            def route(item):
+                duplicates.prepare(item)
+                effective = duplicates.effective(item)
+                return effective, quarantine if 'duplicate_of' in effective else mover
             self.status('preflight', 0, total)
             for n, item in enumerate(plan['files'], 1):
                 if self.stop():
                     raise InterruptedError('Przerwano')
-                if mover.preflight(item):
+                effective, executor = route(item)
+                if executor.preflight(effective):
                     done += 1
                 if n % 64 == 0 or n == total:
                     self.status('preflight', n, total)
@@ -96,7 +105,8 @@ class Organizer:
                 for item in plan['files']:
                     if self.stop():
                         raise InterruptedError('Przerwano')
-                    if not mover.move(item):
+                    effective, executor = route(item)
+                    if not executor.move(effective):
                         continue
                     done += 1
                     elapsed = time.monotonic()-self.started
@@ -106,14 +116,15 @@ class Organizer:
             for n, item in enumerate(plan['files'], 1):
                 if Path(item['source']).exists():
                     raise ValueError('Źródło nadal istnieje: '+item['source'])
-                mover.valid(Path(item['destination']), item)
+                effective = duplicates.effective(item)
+                mover.valid(Path(effective['destination']), effective)
                 if n % 64 == 0 or n == total:
                     self.status('verifying', n, total)
             save(self.job/'verification.json', dict(files=total, bytes=plan['bytes'], errors=0))
             self.status('cleanup', total, total)
             removed, cleanup_errors = cleanup_empty_directories(plan, source_root, target_root, self.stop)
             save(self.job/'cleanup.json', dict(removed=removed, warnings=cleanup_errors))
-            self.status('complete', total, total, removed_empty_directories=len(removed), cleanup_warnings=len(cleanup_errors))
+            self.status('complete', total, total, duplicate_files=len(duplicates.routes), removed_empty_directories=len(removed), cleanup_warnings=len(cleanup_errors))
         except InterruptedError:
             self.status('paused', done, total)
             raise
