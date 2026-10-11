@@ -8,7 +8,7 @@ import shutil
 import stat
 import time
 from pathlib import Path
-from .extensions import GROUPS, normalize_extensions, matches
+from .extensions import GROUPS, normalize_extensions, matches, scope_categories
 from .metadata import PHOTOS, VIDEOS, SIDECARS, capture
 
 SKIP = {'@eadir', '#recycle', '$recycle.bin', 'system volume information'}
@@ -100,8 +100,7 @@ class Organizer:
         else:
             raise ValueError('Źródło i cel nie mogą być identyczne; cel nie może zawierać źródła')
         folder_for(datetime.now(), pattern)
-        if scope not in ('photos', 'media', 'multimedia', 'all', 'audio'):
-            raise ValueError('Nieprawidłowy zakres')
+        categories = scope_categories(scope)
         extensions = normalize_extensions(extensions)
         config = dict(source=str(source), target=str(target), pattern=pattern, scope=scope, timezone=timezone)
         if extensions is not None:
@@ -114,6 +113,7 @@ class Organizer:
         lock = self.lock()
         try:
             rows, skipped = [], []
+            source_directories = [str(source)]
             stack = [source]
             self.status('scanning', 0, 0)
             while stack:
@@ -134,6 +134,7 @@ class Organizer:
                                 skipped.append(e.path)
                             else:
                                 stack.append(Path(e.path))
+                                source_directories.append(str(resolved))
                         elif e.is_file(follow_symlinks=False):
                             s = e.stat(follow_symlinks=False)
                             rows.append(dict(path=e.path, size=s.st_size, mtime=s.st_mtime))
@@ -146,9 +147,9 @@ class Organizer:
                     raise InterruptedError('Przerwano planowanie')
                 p = Path(r['path'])
                 ext = p.suffix.lower().lstrip('.')
-                included = (scope in ('all', 'multimedia') or (scope == 'photos' and ext in PHOTOS) or
-                            (scope == 'media' and ext in PHOTOS | VIDEOS) or
-                            (scope == 'audio' and ext in GROUPS['Dźwięk']))
+                included = (('photos' in categories and ext in PHOTOS) or
+                            ('video' in categories and ext in VIDEOS) or
+                            ('audio' in categories and ext in GROUPS['Dźwięk']))
                 if included and matches(p, extensions):
                     date, method, errs = capture(p, r['mtime'], timezone, lookup)
                     dates[r['path']] = (date, method)
@@ -211,6 +212,7 @@ class Organizer:
                     reserved.add(str(dst).casefold())
                     files.append(dict(source=r['path'], destination=str(dst), size=r['size'], mtime=r['mtime'], date_source=method))
             plan = dict(version=1, config=config, files=files, skipped=skipped, warnings=warnings,
+                        source_directories=source_directories,
                         bytes=sum(r['size'] for r in files))
             save(self.job/'plan.json', plan)
             self.status('plan_complete', len(files), len(files), bytes=plan['bytes'])
@@ -380,7 +382,40 @@ class Organizer:
                 if n % 64 == 0 or n == total:
                     self.status('verifying', n, total)
             save(self.job/'verification.json', dict(files=total, bytes=plan['bytes'], errors=0))
-            self.status('complete', total, total)
+            self.status('cleanup', total, total)
+            directories = {Path(p) for p in plan.get('source_directories', [])}
+            for item in plan['files']:
+                parent = Path(item['source']).parent
+                while parent != source_root.parent:
+                    directories.add(parent)
+                    if parent == source_root:
+                        break
+                    parent = parent.parent
+            removed, cleanup_errors = [], []
+            for directory in sorted(directories, key=lambda p: len(p.parts), reverse=True):
+                if self.stop():
+                    raise InterruptedError('Przerwano sprzątanie')
+                try:
+                    directory.relative_to(source_root)
+                    # Never delete a drive/share/mount root or the destination tree.
+                    if directory == Path(directory.anchor) or os.path.ismount(directory):
+                        continue
+                    try:
+                        directory.relative_to(target_root)
+                        continue
+                    except ValueError:
+                        pass
+                    if directory.is_symlink():
+                        continue
+                    directory.rmdir()  # Atomic: refuses directories containing any files.
+                    removed.append(str(directory))
+                except FileNotFoundError:
+                    pass
+                except OSError as e:
+                    if e.errno not in (errno.ENOTEMPTY, errno.EEXIST):
+                        cleanup_errors.append(dict(path=str(directory), error=str(e)))
+            save(self.job/'cleanup.json', dict(removed=removed, warnings=cleanup_errors))
+            self.status('complete', total, total, removed_empty_directories=len(removed), cleanup_warnings=len(cleanup_errors))
         except InterruptedError:
             self.status('paused', done, total)
             raise

@@ -14,7 +14,7 @@ def main(argv=None):
     p.add_argument('target')
     p.add_argument('--job', required=True)
     p.add_argument('--format', default='%Y/%m', dest='pattern')
-    p.add_argument('--scope', choices=['photos', 'media', 'audio', 'multimedia'], default='multimedia')
+    p.add_argument('--scope', default='multimedia', help='Zakres: photos,video,audio; można połączyć przecinkami')
     p.add_argument('--timezone', default='Europe/Warsaw')
     p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4,mp3 (wyłącznie multimedia)')
     for command in ('apply', 'status'):
@@ -29,7 +29,7 @@ def main(argv=None):
     p.add_argument('target')
     p.add_argument('--job', required=True, help='Identyfikator zadania na serwerze')
     p.add_argument('--format', default='%Y/%m', dest='pattern')
-    p.add_argument('--scope', choices=['photos', 'media', 'audio', 'multimedia'], default='multimedia')
+    p.add_argument('--scope', default='multimedia', help='Zakres: photos,video,audio; można połączyć przecinkami')
     p.add_argument('--timezone', default='Europe/Warsaw')
     p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4,mp3 (wyłącznie multimedia)')
     p.add_argument('--apply', action='store_true', help='Po planowaniu rozpocznij przenoszenie')

@@ -164,3 +164,18 @@ def normalize_extensions(values):
 def matches(path, extensions):
     ext = Path(path).suffix.lower().lstrip('.')
     return ext in KNOWN and (extensions is None or ext in extensions)
+
+
+def scope_categories(scope):
+    aliases = {'multimedia': {'photos','video','audio'}, 'all': {'photos','video','audio'},
+               'media': {'photos','video'}}
+    result = set()
+    for token in scope.split(','):
+        token = token.strip()
+        if token in aliases:
+            result.update(aliases[token])
+        elif token in ('photos','video','audio'):
+            result.add(token)
+        else:
+            raise ValueError('Wybierz zakres: photos, video, audio lub ich kombinację.')
+    return result

@@ -9,13 +9,27 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from .core import Organizer
-from .extensions import GROUPS, normalize_extensions
+from .extensions import GROUPS, normalize_extensions, scope_categories
 
 def main():
     root = tk.Tk()
     root.title('PhotoSort — porządkowanie kolekcji')
+    if os.environ.get('PHOTOSORT_SMOKE_TEST') == '1':
+        root.withdraw()
+        root.after(700, root.destroy)
     root.geometry('860x780')
-    root.minsize(700, 580)
+    root.minsize(700, 680)
+    style = ttk.Style(root)
+    style.theme_use('clam')
+    style.configure('.', font=('Segoe UI', 10), background='#f4f6fb', foreground='#18243b')
+    style.configure('TButton', padding=(12,7))
+    style.configure('TEntry', padding=6, fieldbackground='white')
+    style.configure('TCombobox', padding=5)
+    style.configure('TProgressbar', background='#4f46e5', troughcolor='#e2e7f0')
+    root.configure(background='#f4f6fb')
+    icon_path = Path(__file__).parent.parent/'assets/photosort.ico'
+    if icon_path.exists() and os.name == 'nt':
+        root.iconbitmap(str(icon_path))
     box = ttk.Frame(root, padding=22)
     box.pack(fill='both', expand=True)
     ttk.Label(box, text='PhotoSort', font=('Segoe UI', 23, 'bold')).pack(anchor='w')
@@ -40,7 +54,20 @@ def main():
     row('Źródło', 'source', True)
     row('Cel', 'target', True)
     row('Format folderów', 'pattern', choices=['%Y/%m', '%Y/%m/%d', '%Y-%m', '%Y'])
-    row('Zakres', 'scope', choices=['multimedia', 'media', 'photos', 'audio'])
+    scope_row = ttk.Frame(box)
+    scope_row.pack(fill='x', pady=5)
+    ttk.Label(scope_row, text='Zakres', width=19).pack(side='left')
+    scope_values = {}
+    for code, title in [('photos','Zdjęcia i RAW'), ('video','Filmy'), ('audio','Dźwięk')]:
+        scope_values[code] = tk.BooleanVar(value=True)
+        ttk.Checkbutton(scope_row, text=title, variable=scope_values[code]).pack(side='left', padx=(0,16))
+    def chosen_scope():
+        return ','.join(code for code,value in scope_values.items() if value.get())
+    def update_scope(*unused):
+        categories = scope_categories(variables['scope'].get())
+        for code, value in scope_values.items():
+            value.set(code in categories)
+    variables['scope'].trace_add('write', update_scope)
     extension_state = {'values': None}
     extension_label = tk.StringVar(value='Wszystkie multimedia (według zakresu)')
     def choose_extensions():
@@ -107,7 +134,7 @@ def main():
     extension_row.pack(fill='x', pady=5)
     ttk.Button(extension_row, text='Wybierz rozszerzenia…', command=choose_extensions).pack(side='left')
     ttk.Label(extension_row, textvariable=extension_label).pack(side='left', padx=12)
-    ttk.Label(box, text='multimedia: zdjęcia, filmy i dźwięk · media: zdjęcia i filmy · photos: zdjęcia · audio: dźwięk\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
+    ttk.Label(box, text='Zaznacz dowolną kombinację zakresów. Po weryfikacji puste foldery źródłowe zostaną usunięte.\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
     ttk.Label(box, text='Lokalnie → lokalnie: wybierz dwa foldery na komputerze.\nSSH: wpisz adres NAS i nazwę użytkownika DSM. Hasło wpisujesz w osobnym terminalu;\nznaki hasła nie są widoczne. Przy pierwszym połączeniu sprawdź klucz serwera.').pack(anchor='w', pady=4)
     actions_ssh = ttk.Frame(box)
     actions_ssh.pack(fill='x')
@@ -134,6 +161,8 @@ def main():
         else:
             messagebox.showinfo('SSH w terminalu', 'Uruchom w terminalu:\n\n'+__import__('shlex').join(args))
     def prefix():
+        if getattr(sys, 'frozen', False):
+            return [str(Path(sys.executable).with_name('PhotoSort-Terminal.exe'))]
         launcher = Path(__file__).parent.parent/'launch.py'
         return [sys.executable, str(launcher)] if launcher.exists() else [sys.executable, '-m', 'photosort']
     def connect():
@@ -145,7 +174,7 @@ def main():
     def remote(action):
         job = Path(jobvar.get()).name
         args = prefix() + ['remote', ssh_host(), variables['source'].get(), variables['target'].get(),
-                '--wait', '--job', job, '--format', variables['pattern'].get(), '--scope', variables['scope'].get()]
+                '--wait', '--job', job, '--format', variables['pattern'].get(), '--scope', chosen_scope()]
         if extension_state['values'] is not None:
             args += ['--extensions', ','.join(extension_state['values'])]
         if action == 'apply':
@@ -163,6 +192,7 @@ def main():
         stopped.clear()
         job = jobvar.get()
         settings = {key: value.get() for key, value in variables.items()}
+        settings['scope'] = chosen_scope()
         extensions = list(extension_state['values']) if extension_state['values'] is not None else None
         def worker():
             try:
@@ -204,6 +234,8 @@ def main():
                 speed = s.get('rate_current', s.get('files_per_second', 0))
                 eta = s.get('eta_current', s.get('eta_seconds'))
                 text = '{} | {:.2f}% | {}/{} | {:.2f} plików/s | pozostało: {}'.format(s['stage'], s['percent'], s['done'], s['total'], speed, str(eta)+' s' if eta is not None else '—')
+                if s['stage'] == 'complete':
+                    text += ' | usunięto pustych folderów: '+str(s.get('removed_empty_directories', 0))
                 bar['value'] = s['percent']
             label.set(text)
             output.insert('end', text+'\n')
