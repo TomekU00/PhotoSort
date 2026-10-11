@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from .extensions import GROUPS, normalize_extensions, matches, scope_categories
 from .metadata import PHOTOS, VIDEOS, SIDECARS, capture
+from .resources import resource_reason
 
 SKIP = {'@eadir', '#recycle', '$recycle.bin', 'system volume information'}
 
@@ -86,7 +87,7 @@ class Organizer:
             raise RuntimeError('Zadanie zablokowane: proces działa albo pozostał lock po awarii. Sprawdź proces przed usunięciem lock.')
         return p
 
-    def plan(self, source, target, pattern='%Y/%m', scope='multimedia', timezone='Europe/Warsaw', extensions=None):
+    def plan(self, source, target, pattern='%Y/%m', scope='multimedia', timezone='Europe/Warsaw', extensions=None, skip_app_resources=False, exclude_dirs=None):
         from datetime import datetime
         source, target = Path(source).expanduser().resolve(), Path(target).expanduser().resolve()
         if not source.is_dir():
@@ -103,6 +104,19 @@ class Organizer:
         categories = scope_categories(scope)
         extensions = normalize_extensions(extensions)
         config = dict(source=str(source), target=str(target), pattern=pattern, scope=scope, timezone=timezone)
+        exclusions = []
+        for value in exclude_dirs or []:
+            p = Path(value).expanduser()
+            p = (source/p if not p.is_absolute() else p).resolve()
+            try:
+                p.relative_to(source)
+            except ValueError:
+                raise ValueError('Pomijany katalog musi znajdować się w źródle: '+str(p))
+            exclusions.append(p)
+        if skip_app_resources:
+            config['skip_app_resources'] = True
+        if exclusions:
+            config['exclude_dirs'] = sorted({str(p) for p in exclusions})
         if extensions is not None:
             config['extensions'] = extensions
         if (self.job/'plan.json').exists():
@@ -112,14 +126,31 @@ class Organizer:
             return plan
         lock = self.lock()
         try:
-            rows, skipped = [], []
+            rows, skipped, skipped_resources = [], [], []
             source_directories = [str(source)]
             stack = [source]
             self.status('scanning', 0, 0)
             while stack:
                 if self.stop():
                     raise InterruptedError('Przerwano planowanie')
-                with os.scandir(stack.pop()) as entries:
+                directory = stack.pop()
+                reason = None
+                for excluded in exclusions:
+                    try:
+                        directory.relative_to(excluded)
+                        reason = 'Katalog pominięty przez użytkownika'
+                        break
+                    except ValueError:
+                        pass
+                if not reason and skip_app_resources:
+                    reason = resource_reason(directory)
+                if reason:
+                    skipped.append(str(directory))
+                    skipped_resources.append(dict(path=str(directory), reason=reason))
+                    if str(directory) in source_directories:
+                        source_directories.remove(str(directory))
+                    continue
+                with os.scandir(directory) as entries:
                     for e in entries:
                         if e.name.casefold() in SKIP or e.is_symlink():
                             skipped.append(e.path)
@@ -212,6 +243,7 @@ class Organizer:
                     reserved.add(str(dst).casefold())
                     files.append(dict(source=r['path'], destination=str(dst), size=r['size'], mtime=r['mtime'], date_source=method))
             plan = dict(version=1, config=config, files=files, skipped=skipped, warnings=warnings,
+                        skipped_resources=skipped_resources,
                         source_directories=source_directories,
                         bytes=sum(r['size'] for r in files))
             save(self.job/'plan.json', plan)

@@ -17,6 +17,8 @@ def main(argv=None):
     p.add_argument('--scope', default='multimedia', help='Zakres: photos,video,audio; można połączyć przecinkami')
     p.add_argument('--timezone', default='Europe/Warsaw')
     p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4,mp3 (wyłącznie multimedia)')
+    p.add_argument('--skip-app-resources', action='store_true', help='Pomijaj rozpoznane katalogi aplikacji i podglądów')
+    p.add_argument('--exclude-dir', action='append', default=[], help='Pomiń katalog w źródle (można podać wielokrotnie)')
     for command in ('apply', 'status'):
         p = sub.add_parser(command)
         p.add_argument('--job', required=True)
@@ -33,6 +35,8 @@ def main(argv=None):
     p.add_argument('--timezone', default='Europe/Warsaw')
     p.add_argument('--extensions', help='Lista rozszerzeń, np. jpg,cr3,mp4,mp3 (wyłącznie multimedia)')
     p.add_argument('--apply', action='store_true', help='Po planowaniu rozpocznij przenoszenie')
+    p.add_argument('--skip-app-resources', action='store_true', help='Pomijaj rozpoznane katalogi aplikacji i podglądów')
+    p.add_argument('--exclude-dir', action='append', default=[], help='Pomiń katalog na serwerze wewnątrz źródła; można powtarzać')
     p.add_argument('--resume', action='store_true', help='Uruchom apply dla istniejącego planu')
     p.add_argument('--wait', action='store_true', help='Pozostaw terminal otwarty do naciśnięcia Enter')
     p.add_argument('--status', action='store_true', help='Odczytaj status zadania')
@@ -63,7 +67,7 @@ def main(argv=None):
     org = Organizer(args.job, notify, lambda: stopped[0])
     try:
         if args.command == 'plan':
-            org.plan(args.source, args.target, args.pattern, args.scope, args.timezone, args.extensions)
+            org.plan(args.source, args.target, args.pattern, args.scope, args.timezone, args.extensions, args.skip_app_resources, args.exclude_dir)
         else:
             org.apply()
     except InterruptedError:

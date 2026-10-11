@@ -62,6 +62,10 @@ def run(args):
         if args.extensions is not None:
             from .extensions import normalize_extensions
             command += ' --extensions '+shlex.quote(','.join(normalize_extensions(args.extensions)))
+        if getattr(args, 'skip_app_resources', False):
+            command += ' --skip-app-resources'
+        for directory in getattr(args, 'exclude_dir', []):
+            command += ' --exclude-dir '+shlex.quote(directory)
         if args.apply:
             command += ' && python3 '+app+'/__main__.py apply'+flags
     # Detach on server; a broken connection or closed PC does not stop the worker.

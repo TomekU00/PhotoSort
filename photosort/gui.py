@@ -133,6 +133,8 @@ def main():
     extension_row = ttk.Frame(box)
     extension_row.pack(fill='x', pady=5)
     ttk.Button(extension_row, text='Wybierz rozszerzenia…', command=choose_extensions).pack(side='left')
+    skip_resources = tk.BooleanVar(value=False)
+    ttk.Checkbutton(box, text='Pomijaj zasoby aplikacji i podglądy Lightroom', variable=skip_resources).pack(anchor='w', pady=5)
     ttk.Label(extension_row, textvariable=extension_label).pack(side='left', padx=12)
     ttk.Label(box, text='Zaznacz dowolną kombinację zakresów. Po weryfikacji puste foldery źródłowe zostaną usunięte.\n%Y: rok · %m: miesiąc · %d: dzień. W SSH wpisz ścieżki /volume1/…').pack(anchor='w', pady=8)
     ttk.Label(box, text='Lokalnie → lokalnie: wybierz dwa foldery na komputerze.\nSSH: wpisz adres NAS i nazwę użytkownika DSM. Hasło wpisujesz w osobnym terminalu;\nznaki hasła nie są widoczne. Przy pierwszym połączeniu sprawdź klucz serwera.').pack(anchor='w', pady=4)
@@ -177,6 +179,8 @@ def main():
                 '--wait', '--job', job, '--format', variables['pattern'].get(), '--scope', chosen_scope()]
         if extension_state['values'] is not None:
             args += ['--extensions', ','.join(extension_state['values'])]
+        if skip_resources.get():
+            args += ['--skip-app-resources']
         if action == 'apply':
             args += ['--resume']
         terminal(args)
@@ -194,12 +198,13 @@ def main():
         settings = {key: value.get() for key, value in variables.items()}
         settings['scope'] = chosen_scope()
         extensions = list(extension_state['values']) if extension_state['values'] is not None else None
+        skip_apps = skip_resources.get()
         def worker():
             try:
                 org = Organizer(job, events.put, stopped.is_set)
                 if action == 'plan':
-                    plan = org.plan(settings['source'], settings['target'], settings['pattern'], settings['scope'], extensions=extensions)
-                    events.put({'message': 'Plan: {} plików, {:.2f} GB. Ostrzeżenia metadanych: {}. Plan zapisany w katalogu zadania.'.format(len(plan['files']), plan['bytes']/1e9, len(plan['warnings']))})
+                    plan = org.plan(settings['source'], settings['target'], settings['pattern'], settings['scope'], extensions=extensions, skip_app_resources=skip_apps)
+                    events.put({'message': 'Plan: {} plików, {:.2f} GB. Ostrzeżenia metadanych: {}. Pominięte katalogi zasobów: {}. Przyczyny: skipped_resources w plan.json.'.format(len(plan['files']), plan['bytes']/1e9, len(plan['warnings']), len(plan.get('skipped_resources', [])))})
                 else:
                     org.apply()
             except InterruptedError:
@@ -220,6 +225,7 @@ def main():
             p = Path(path)/'plan.json'
             if p.exists():
                 config = json.loads(p.read_text(encoding='utf-8'))['config']
+                skip_resources.set(config.get('skip_app_resources', False))
                 extension_state['values'] = config.get('extensions')
                 extension_label.set('Wybrane rozszerzenia: '+str(len(config['extensions'])) if config.get('extensions') is not None else 'Wszystkie multimedia (według zakresu)')
                 for key in ('source', 'target', 'pattern', 'scope'):
