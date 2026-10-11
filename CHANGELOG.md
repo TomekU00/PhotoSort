@@ -4,6 +4,12 @@ Historia zmian aplikacji do wersji 0.1.7. Wersje 0.1.2–0.1.5 były etapami roz
 
 ## Niewydane
 
+- Naprawa końcowego wpisu dziennika bez nowej linii przed dopisywaniem kolejnych zdarzeń.
+- Wznowienie przerwanej operacji link/unlink po sprawdzeniu urządzenia i inode obu ścieżek z dziennikiem.
+- Pomijanie zerowej daty QuickTime oraz niepełnych i nieobsługiwanych nagłówków mvhd; dalsze szukanie daty w JSON lub mtime.
+- Indeks rekordów plików towarzyszących zamiast przeszukiwania całej listy dla każdego JSON/XMP.
+- Zapis postępu najwyżej raz na sekundę wewnątrz etapu, z natychmiastowym zapisem zmiany etapu i jego zakończenia. Trwałość dziennika pozostaje bez zmian.
+
 - Refaktor w trzech etapach: testy granic odzyskiwania; osobne moduły dziennika i operacji plikowych; etapy planowania oraz kontroler lokalnych zadań GUI.
 - Zachowanie formatu version=1, identyfikatorów planów, zdarzeń dziennika i kolejności trwałych zapisów; bez migracji istniejących zadań.
 - Testy GUI, równoległego uruchomienia, zatrzymania i wznowienia oraz samodzielnego payloadu SSH.
