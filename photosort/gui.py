@@ -60,8 +60,16 @@ def main():
         selected = extension_state['values']
         toggles = {}
         for name, values in GROUPS.items():
-            panel = ttk.Frame(tabs, padding=10)
-            tabs.add(panel, text=name)
+            page = ttk.Frame(tabs)
+            tabs.add(page, text=name)
+            canvas = tk.Canvas(page, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(page, orient='vertical', command=canvas.yview)
+            scrollbar.pack(side='right', fill='y')
+            canvas.pack(side='left', fill='both', expand=True)
+            canvas.configure(yscrollcommand=scrollbar.set)
+            panel = ttk.Frame(canvas, padding=10)
+            canvas.create_window((0,0), window=panel, anchor='nw')
+            panel.bind('<Configure>', lambda event, view=canvas: view.configure(scrollregion=view.bbox('all')))
             local = []
             for n, ext in enumerate(sorted(values)):
                 value = tk.BooleanVar(value=selected is None or ext in selected)
